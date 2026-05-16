@@ -1,9 +1,12 @@
 import * as THREE from "three";
 import { Scene } from "./Scene";
 import { Camera } from "./Camera";
+import { Input } from "./Input";
 import { createLevel1 } from "../levels/L1_Eoraptor";
 import type { Level } from "../levels/Level";
 import { Dinosaur } from "../entities/Dinosaur";
+
+const JUMP_BUFFER_MS = 100;
 
 export class Game {
   private scene: Scene;
@@ -11,6 +14,7 @@ export class Game {
   private clock: THREE.Clock;
   private level: Level;
   private player: Dinosaur;
+  private input: Input;
   private rafId: number | null = null;
   private running = false;
 
@@ -18,6 +22,7 @@ export class Game {
     this.scene = new Scene(canvas);
     this.camera = new Camera();
     this.clock = new THREE.Clock();
+    this.input = new Input();
 
     this.level = createLevel1();
     this.scene.scene.add(this.level.root);
@@ -52,6 +57,16 @@ export class Game {
   private loop = () => {
     if (!this.running) return;
     const dt = Math.min(this.clock.getDelta(), 1 / 30);
+
+    this.player.setMoveInput(this.input.dir);
+
+    const jumpAgeMs = performance.now() - this.input.jumpPressedAt();
+    if (jumpAgeMs <= JUMP_BUFFER_MS && this.player.canJumpNow()) {
+      if (this.player.tryJump()) {
+        this.input.consumeJumpPress();
+      }
+    }
+
     this.player.update(dt);
     this.camera.update(dt);
     this.level.update(dt, this.camera.camera.position.x);
@@ -61,6 +76,7 @@ export class Game {
 
   dispose() {
     this.stop();
+    this.input.dispose();
     this.level.dispose();
     this.scene.dispose();
   }
