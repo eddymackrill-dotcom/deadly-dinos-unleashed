@@ -1,12 +1,29 @@
 import * as THREE from "three";
+import gsap from "gsap";
 import { Scene } from "./Scene";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
+import { PostProcess } from "./PostProcess";
 import { createLevel1 } from "../levels/L1_Eoraptor";
 import type { Level } from "../levels/Level";
 import { Dinosaur } from "../entities/Dinosaur";
 
 const JUMP_BUFFER_MS = 100;
+
+export class GameFX {
+  constructor(private intensityRef: { value: number }) {}
+
+  titleSting() {
+    gsap.killTweensOf(this.intensityRef);
+    gsap
+      .timeline()
+      .set(this.intensityRef, { value: 0 })
+      .to(this.intensityRef, { value: 0.008, duration: 0.1, ease: "power2.out" })
+      .to(this.intensityRef, { value: 0.003, duration: 0.1, ease: "power2.in" })
+      .to(this.intensityRef, { value: 0.003, duration: 2.4 })
+      .to(this.intensityRef, { value: 0, duration: 0.4, ease: "power2.in" });
+  }
+}
 
 export class Game {
   private scene: Scene;
@@ -15,6 +32,8 @@ export class Game {
   private level: Level;
   private player: Dinosaur;
   private input: Input;
+  private postProcess: PostProcess;
+  readonly fx: GameFX;
   private rafId: number | null = null;
   private running = false;
 
@@ -30,6 +49,9 @@ export class Game {
     this.player = new Dinosaur();
     this.scene.scene.add(this.player.root);
     this.camera.follow(this.player);
+
+    this.postProcess = new PostProcess(this.scene.renderer, this.scene.scene, this.camera.camera);
+    this.fx = new GameFX(this.postProcess.glitchIntensity);
 
     void this.player.load({
       url: "/models/eoraptor.glb",
@@ -70,7 +92,7 @@ export class Game {
     this.player.update(dt);
     this.camera.update(dt);
     this.level.update(dt, this.camera.camera.position.x);
-    this.scene.renderer.render(this.scene.scene, this.camera.camera);
+    this.postProcess.render();
     this.rafId = requestAnimationFrame(this.loop);
   };
 
@@ -78,6 +100,7 @@ export class Game {
     this.stop();
     this.input.dispose();
     this.level.dispose();
+    this.postProcess.dispose();
     this.scene.dispose();
   }
 }

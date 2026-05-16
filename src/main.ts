@@ -10,7 +10,7 @@ if (!uiRoot) throw new Error("#ui-root not found in index.html");
 
 const game = new Game(canvas);
 game.start();
-mountUI(uiRoot);
+mountUI(uiRoot, () => game.fx.titleSting());
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => game.dispose());

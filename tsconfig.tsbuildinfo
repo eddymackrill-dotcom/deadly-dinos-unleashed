@@ -1,0 +1,1 @@
+{"root":["./src/main.ts","./src/vite-env.d.ts","./src/entities/dinosaur.ts","./src/game/camera.ts","./src/game/game.ts","./src/game/input.ts","./src/game/postprocess.ts","./src/game/scene.ts","./src/levels/l1_eoraptor.ts","./src/levels/level.ts","./src/levels/parallaxbackground.ts","./src/shaders/glitch.ts","./src/ui/app.tsx"],"version":"5.9.3"}

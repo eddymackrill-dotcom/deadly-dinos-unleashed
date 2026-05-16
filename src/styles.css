@@ -32,3 +32,10 @@ body {
 #ui-root > * {
   pointer-events: auto;
 }
+
+.title-glitch {
+  text-shadow:
+    -1.5px 0 rgba(255, 60, 100, 0.7),
+    1.5px 0 rgba(60, 200, 255, 0.55);
+  letter-spacing: 0.06em;
+}
