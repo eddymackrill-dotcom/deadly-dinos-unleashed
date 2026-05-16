@@ -3,12 +3,13 @@ import * as THREE from "three";
 export class Scene {
   readonly scene: THREE.Scene;
   readonly renderer: THREE.WebGLRenderer;
+  readonly sunLight: THREE.DirectionalLight;
   private resizeHandler: () => void;
 
   constructor(canvas: HTMLCanvasElement) {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x1a0f08);
-    this.scene.fog = new THREE.Fog(0x1a0f08, 25, 80);
+    this.scene.background = new THREE.Color(0xd4a373);
+    this.scene.fog = new THREE.Fog(0xd4a373, 22, 70);
 
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -18,40 +19,22 @@ export class Scene {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
 
-    this.addLights();
-    this.addGround();
+    const ambient = new THREE.AmbientLight(0xffd2a8, 0.65);
+    this.scene.add(ambient);
+
+    this.sunLight = new THREE.DirectionalLight(0xfff1c8, 1.25);
+    this.sunLight.position.set(8, 14, 6);
+    this.scene.add(this.sunLight);
+
+    const rim = new THREE.DirectionalLight(0x7a4a2a, 0.45);
+    rim.position.set(-6, 4, -8);
+    this.scene.add(rim);
 
     this.resizeHandler = this.onResize.bind(this);
     window.addEventListener("resize", this.resizeHandler);
-  }
-
-  private addLights() {
-    const ambient = new THREE.AmbientLight(0xffd2a8, 0.55);
-    this.scene.add(ambient);
-
-    const sun = new THREE.DirectionalLight(0xfff1c8, 1.1);
-    sun.position.set(8, 14, 6);
-    this.scene.add(sun);
-
-    const rim = new THREE.DirectionalLight(0x6a4a2a, 0.35);
-    rim.position.set(-6, 4, -8);
-    this.scene.add(rim);
-  }
-
-  private addGround() {
-    const geometry = new THREE.PlaneGeometry(200, 20, 1, 1);
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xb37a48,
-      roughness: 0.95,
-      metalness: 0,
-      flatShading: true,
-    });
-    const ground = new THREE.Mesh(geometry, material);
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = 0;
-    ground.name = "ground";
-    this.scene.add(ground);
   }
 
   private onResize() {
