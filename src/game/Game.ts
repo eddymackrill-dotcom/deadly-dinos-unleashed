@@ -3,12 +3,14 @@ import { Scene } from "./Scene";
 import { Camera } from "./Camera";
 import { createLevel1 } from "../levels/L1_Eoraptor";
 import type { Level } from "../levels/Level";
+import { Dinosaur } from "../entities/Dinosaur";
 
 export class Game {
   private scene: Scene;
   private camera: Camera;
   private clock: THREE.Clock;
   private level: Level;
+  private player: Dinosaur;
   private rafId: number | null = null;
   private running = false;
 
@@ -20,11 +22,16 @@ export class Game {
     this.level = createLevel1();
     this.scene.scene.add(this.level.root);
 
-    const placeholder = {
-      position: new THREE.Vector3(0, 1, 0),
-      velocityX: 0,
-    };
-    this.camera.follow(placeholder);
+    this.player = new Dinosaur();
+    this.scene.scene.add(this.player.root);
+    this.camera.follow(this.player);
+
+    void this.player.load({
+      url: "/models/eoraptor.glb",
+      targetHeight: 0.8,
+      idleNameHint: "idle",
+      runNameHint: "run",
+    });
   }
 
   start() {
@@ -44,7 +51,8 @@ export class Game {
 
   private loop = () => {
     if (!this.running) return;
-    const dt = this.clock.getDelta();
+    const dt = Math.min(this.clock.getDelta(), 1 / 30);
+    this.player.update(dt);
     this.camera.update(dt);
     this.level.update(dt, this.camera.camera.position.x);
     this.scene.renderer.render(this.scene.scene, this.camera.camera);
