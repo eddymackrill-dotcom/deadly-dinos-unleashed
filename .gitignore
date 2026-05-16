@@ -9,3 +9,4 @@ dist-types
 .env
 .env.local
 *.bak
+*.tsbuildinfo
