@@ -91,7 +91,11 @@ export class Game {
 
     this.player.update(dt);
     this.camera.update(dt);
-    this.level.update(dt, this.camera.camera.position.x);
+    this.level.update({
+      dt,
+      cameraX: this.camera.camera.position.x,
+      cameraQuaternion: this.camera.camera.quaternion,
+    });
     this.postProcess.render();
     this.rafId = requestAnimationFrame(this.loop);
   };

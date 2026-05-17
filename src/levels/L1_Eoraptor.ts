@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { Level } from "./Level";
 import { ParallaxBackground } from "./ParallaxBackground";
+import { ScentParticles } from "../entities/ScentParticles";
 
 function mulberry32(a: number) {
   return function () {
@@ -161,12 +162,18 @@ export function createLevel1(): Level {
   ]);
   root.add(parallax.root);
 
+  const scent = new ScentParticles();
+  scent.setPosition(12, 0.4, 0);
+  root.add(scent.root);
+
   return {
     root,
-    update(_dt, cameraX) {
+    update({ dt, cameraX, cameraQuaternion }) {
       parallax.update(cameraX);
+      scent.update(dt, cameraQuaternion);
     },
     dispose() {
+      scent.dispose();
       disposeTree(root);
     },
   };
