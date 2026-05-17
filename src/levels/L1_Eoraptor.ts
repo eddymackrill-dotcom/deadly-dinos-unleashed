@@ -1,7 +1,16 @@
 import * as THREE from "three";
-import type { Level } from "./Level";
+import type { ActiveScentInfo, Level, ScentNodeTag } from "./Level";
 import { ParallaxBackground } from "./ParallaxBackground";
-import { ScentParticles } from "../entities/ScentParticles";
+import { ScentNode } from "../entities/ScentNode";
+import { Chevron } from "../entities/Chevron";
+
+const NODE_REACH_RADIUS = 3.0;
+
+const NODE_SEQUENCE: Array<{ x: number; tag: ScentNodeTag }> = [
+  { x: 12, tag: "collect" },
+  { x: 28, tag: "chase" },
+  { x: 46, tag: "collect" },
+];
 
 function mulberry32(a: number) {
   return function () {
@@ -162,18 +171,62 @@ export function createLevel1(): Level {
   ]);
   root.add(parallax.root);
 
-  const scent = new ScentParticles();
-  scent.setPosition(12, 0.4, 0);
-  root.add(scent.root);
+  const nodes: ScentNode[] = NODE_SEQUENCE.map((cfg) => {
+    const node = new ScentNode({
+      position: new THREE.Vector3(cfg.x, 0.4, 0),
+      tag: cfg.tag,
+    });
+    root.add(node.particles.root);
+    return node;
+  });
+  let activeIndex = 0;
+  if (nodes.length > 0) nodes[0].setActive(true);
+
+  const chevron = new Chevron();
+  root.add(chevron.root);
+
+  function syncActive() {
+    nodes.forEach((n, i) => n.setActive(i === activeIndex));
+  }
+
+  function getActive(): ActiveScentInfo | null {
+    if (activeIndex >= nodes.length) return null;
+    const n = nodes[activeIndex];
+    return { index: activeIndex, position: n.position, tag: n.tag };
+  }
 
   return {
     root,
-    update({ dt, cameraX, cameraQuaternion }) {
-      parallax.update(cameraX);
-      scent.update(dt, cameraQuaternion);
+    update({ dt, camera, playerPosition }) {
+      parallax.update(camera.position.x);
+      for (const n of nodes) n.update(dt, camera.quaternion);
+
+      if (activeIndex < nodes.length) {
+        const active = nodes[activeIndex];
+        chevron.setTargetX(active.position.x);
+        chevron.update(playerPosition.x, playerPosition.y, camera, dt);
+        const dx = active.position.x - playerPosition.x;
+        if (Math.abs(dx) <= NODE_REACH_RADIUS) {
+          active.collect();
+          activeIndex++;
+          syncActive();
+        }
+      } else {
+        chevron.setTargetX(null);
+      }
+    },
+    getActiveScent() {
+      return getActive();
+    },
+    getScentTotal() {
+      return nodes.length;
+    },
+    getScentCollected() {
+      return activeIndex;
     },
     dispose() {
-      scent.dispose();
+      for (const n of nodes) n.dispose();
+      chevron.dispose();
       disposeTree(root);
     },
   };

@@ -45,9 +45,33 @@ up better with the desired effect.
 
 ---
 
-## Chunk 2 — Scent node sequence + chevron
+## Chunk 2 — Scent node sequence + chevron ✅
 
-Pending.
+- `src/entities/ScentNode.ts` — waypoint with a `position`, `tag`
+  (`"collect" | "chase" | "stealth" | "defense"`), and its own
+  `ScentParticles`. Only the active node emits.
+- `src/entities/Chevron.ts` — 3D triangle floating above the player
+  pointing toward the active target. When the target is off-screen the
+  arrow clamps to the visible edge in the target direction (uses the
+  perspective camera FOV + aspect to compute the half-width at the action
+  plane). Subtle pulse (sin-driven scale + opacity) keeps it readable.
+- `Level` interface gained `getActiveScent()`, `getScentTotal()`,
+  `getScentCollected()` so the HUD (chunk 3) can read state.
+- `LevelUpdateContext` now passes the live `PerspectiveCamera` and
+  `playerPosition`, replacing the previous `cameraX` /
+  `cameraQuaternion` pair (the camera already exposes both).
+- `L1_Eoraptor` defines 3 nodes at x=12 (collect), x=28 (chase), x=46
+  (collect). Reaching within 3 units of the active node collects it,
+  advances `activeIndex`, and toggles emission to the next node. After
+  the final node, the chevron hides.
+
+### Self-test
+
+- `npx tsc -b` — clean.
+- `npx vite build` — clean.
+- **MANUAL:** verify in `npm run dev` that the chevron points correctly
+  in both directions, clamps to the screen edge when far away, and stops
+  rendering after the last node is collected.
 
 ## Chunk 3 — Tracking bar HUD
 
