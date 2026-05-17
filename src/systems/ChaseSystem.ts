@@ -3,14 +3,16 @@ import gsap from "gsap";
 import { PreyAnimal } from "../entities/PreyAnimal";
 import { useGameState } from "../state/gameState";
 
-// Catch math (player at full sprint should beat the timer with ~2s margin):
+// Catch math (player at full sprint should beat the timer with ~1.5s margin):
 //   time_to_close = head_start / (PLAYER_MAX_SPEED * (1 - PREY_SPEED_RATIO))
 //   = 4 / (5 * 0.18) = 4.44s. Timer 7s -> conservative margin 2.56s. ✓
-//   With catch radius factored in: (4 - 2.0) / 0.9 = 2.22s -> real margin 4.78s.
+//   With catch radius factored in: (4 - 1.2) / 0.9 = 3.11s -> real margin 3.89s.
+//   Hitbox tightened from 2.0 -> 1.2 after playtest reported catches firing
+//   when the player was visibly a couple of units short of the prey.
 const CHASE_DURATION_SECONDS = 7;
 const PREY_SPAWN_AHEAD_X = 4;
 const PREY_SPEED_RATIO = 0.82;
-const CATCH_RADIUS = 2.0;
+const CATCH_RADIUS = 1.2;
 const PLAYER_MAX_SPEED = 5.0;
 const FLASH_DURATION_MS = 900;
 
