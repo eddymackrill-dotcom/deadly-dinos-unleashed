@@ -4,6 +4,7 @@ import gsap from "gsap";
 import "@fontsource/bangers";
 import "@fontsource/inter";
 import { useGameState } from "../state/gameState";
+import { ScoreSummary } from "./ScoreSummary";
 
 interface AppProps {
   onTitleStart: () => void;
@@ -48,36 +49,6 @@ function TrackingBar() {
       </div>
       <div className="font-ui text-xs text-white/70 tracking-wide">
         SCENT {scentCollected} / {scentTotal}
-      </div>
-    </div>
-  );
-}
-
-function MissionFailCard() {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <div className="text-center select-none px-8 py-6 bg-black/70 rounded-xl border border-rose-400/30">
-        <div className="text-5xl font-display text-rose-300 tracking-widest title-glitch">
-          MISSION FAILED
-        </div>
-        <div className="mt-2 font-ui text-sm text-white/70 tracking-wide">
-          The scent went cold.
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MissionCompleteCard() {
-  return (
-    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <div className="text-center select-none px-8 py-6 bg-black/70 rounded-xl border border-emerald-300/30">
-        <div className="text-5xl font-display text-emerald-200 tracking-widest title-glitch">
-          MISSION COMPLETE
-        </div>
-        <div className="mt-2 font-ui text-sm text-white/70 tracking-wide">
-          All scents tracked.
-        </div>
       </div>
     </div>
   );
@@ -150,14 +121,11 @@ function ChaseResultFlash() {
 }
 
 function HUD() {
-  const status = useGameState((s) => s.missionStatus);
   return (
     <>
       <TrackingBar />
       <ChaseTimerBar />
       <ChaseResultFlash />
-      {status === "failed" && <MissionFailCard />}
-      {status === "complete" && <MissionCompleteCard />}
     </>
   );
 }
@@ -209,10 +177,14 @@ function App({ onTitleStart }: AppProps) {
     onTitleStart();
   }, [onTitleStart]);
 
+  const handleRestart = () => window.location.reload();
+  const handleMissions = () => window.location.reload();
+
   return (
     <>
       <HUD />
       {showTitle && <TitleCard onComplete={() => setShowTitle(false)} />}
+      <ScoreSummary onRestart={handleRestart} onMissions={handleMissions} />
     </>
   );
 }

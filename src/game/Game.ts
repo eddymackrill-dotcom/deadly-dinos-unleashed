@@ -16,6 +16,20 @@ const JUMP_BUFFER_MS = 100;
 const NODE_REACH_RADIUS = 3.0;
 const CHASE_FOV = 28;
 
+function activityPoints(tag: "collect" | "chase" | "stealth" | "defense", success: boolean): number {
+  if (!success) return 0;
+  switch (tag) {
+    case "collect":
+      return 100;
+    case "chase":
+      return 250;
+    case "stealth":
+      return 250;
+    case "defense":
+      return 300;
+  }
+}
+
 export class GameFX {
   constructor(private intensityRef: { value: number }) {}
 
@@ -80,6 +94,8 @@ export class Game {
       name: EORAPTOR.name,
       era: EORAPTOR.era,
       region: EORAPTOR.region,
+      stats: EORAPTOR.stats,
+      rank: 1,
     });
     state.setScentProgress(0, this.level.getScentTotal());
 
@@ -191,8 +207,18 @@ export class Game {
   }
 
   private completeActivity(success: boolean) {
-    this.level.collectActive();
+    const active = this.level.getActiveScent();
     const state = useGameState.getState();
+    if (active) {
+      state.recordActivity({
+        index: active.index,
+        tag: active.tag,
+        success,
+        points: activityPoints(active.tag, success),
+      });
+    }
+
+    this.level.collectActive();
     const collected = this.level.getScentCollected();
     const total = this.level.getScentTotal();
     state.setScentProgress(collected, total);

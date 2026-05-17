@@ -148,9 +148,40 @@ up better with the desired effect.
   and drains, CAUGHT! flash + shake on overlap, ESCAPED if you stop
   chasing.
 
-## Chunk 5 — Score summary screen
+## Chunk 5 — Score summary screen ✅
 
-Pending.
+- `src/ui/ScoreSummary.tsx` — DESIGN.md §8 layout, full overlay:
+  - Rank shield (custom SVG with linear-gradient fill).
+  - Dino name + era/region subtitle.
+  - 160px circular arc gauge showing completion% (purple→magenta
+    gradient stroke; `success / total` activities).
+  - 4 stat bars (SPEED/TOUGH/POWER/SENSES) tinted distinctly,
+    `value/STAT_MAX` (CLAUDE.md scale 1..12).
+  - Activity checklist with ✓/× icons and per-activity points
+    (collect = 100, chase win = 250, fail = 0).
+  - PREDATOR POINTS total + MISSIONS / RESTART buttons.
+- `gameState` extended with `dinoStats`, `rank`, `activityResults`,
+  `predatorPointsEarned`, `recordActivity(...)`. `setDino` now takes
+  stats and rank too.
+- `Game.completeActivity` records each activity result with the points
+  helper before advancing.
+- The simple `MissionFailCard` / `MissionCompleteCard` placeholders are
+  replaced by `ScoreSummary`. Buttons reload the page for now —
+  Missions/title scene is post-M2.
+
+### Self-test
+
+- `npx tsc -b` — clean.
+- `npx vite build` — clean.
+- **MANUAL:** finish the level (or stand still until the bar empties)
+  and verify the summary appears with stats, completion %, and the
+  activity list. Buttons reload.
+
+### Known limitation
+
+The Missions button reloads the same level — no mission select screen
+exists yet (M4+). Acceptable: the user's brief explicitly says only one
+level for M2. Restart works correctly via reload.
 
 ## Chunk 6 — localStorage save system
 

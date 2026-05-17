@@ -4,6 +4,22 @@ export type MissionStatus = "playing" | "failed" | "complete";
 
 export type ChaseOutcome = "win" | "lose";
 
+export type ActivityTag = "collect" | "chase" | "stealth" | "defense";
+
+export interface ActivityResult {
+  index: number;
+  tag: ActivityTag;
+  success: boolean;
+  points: number;
+}
+
+export interface DinoStatsView {
+  speed: number;
+  toughness: number;
+  power: number;
+  senses: number;
+}
+
 export interface MissionState {
   trackingPercent: number; // 0..1
   scentCollected: number;
@@ -13,36 +29,48 @@ export interface MissionState {
   dinoName: string;
   era: string;
   region: string;
+  dinoStats: DinoStatsView;
+  rank: number;
+
+  activityResults: ActivityResult[];
+  predatorPointsEarned: number;
 
   chaseActive: boolean;
   chasePercent: number; // 0..1 timer remaining
   chaseResult: ChaseOutcome | null;
-  chaseResultFlashUntil: number; // performance.now() ms; CAUGHT! / ESCAPED! still-frame end time
+  chaseResultFlashUntil: number;
 
   setTrackingPercent: (v: number) => void;
   setScentProgress: (collected: number, total: number) => void;
   setStatus: (s: MissionStatus) => void;
-  setDino: (info: { id: string; name: string; era: string; region: string }) => void;
+  setDino: (info: {
+    id: string;
+    name: string;
+    era: string;
+    region: string;
+    stats: DinoStatsView;
+    rank: number;
+  }) => void;
   startChase: () => void;
   setChasePercent: (v: number) => void;
   endChase: (result: ChaseOutcome, flashUntil: number) => void;
+  recordActivity: (r: ActivityResult) => void;
   reset: () => void;
 }
 
-const initial: Pick<
+const initialDinoStats: DinoStatsView = { speed: 0, toughness: 0, power: 0, senses: 0 };
+
+const initial: Omit<
   MissionState,
-  | "trackingPercent"
-  | "scentCollected"
-  | "scentTotal"
-  | "missionStatus"
-  | "dinoId"
-  | "dinoName"
-  | "era"
-  | "region"
-  | "chaseActive"
-  | "chasePercent"
-  | "chaseResult"
-  | "chaseResultFlashUntil"
+  | "setTrackingPercent"
+  | "setScentProgress"
+  | "setStatus"
+  | "setDino"
+  | "startChase"
+  | "setChasePercent"
+  | "endChase"
+  | "recordActivity"
+  | "reset"
 > = {
   trackingPercent: 1,
   scentCollected: 0,
@@ -52,6 +80,10 @@ const initial: Pick<
   dinoName: "",
   era: "",
   region: "",
+  dinoStats: initialDinoStats,
+  rank: 1,
+  activityResults: [],
+  predatorPointsEarned: 0,
   chaseActive: false,
   chasePercent: 1,
   chaseResult: null,
@@ -64,10 +96,22 @@ export const useGameState = create<MissionState>((set) => ({
   setScentProgress: (collected, total) => set({ scentCollected: collected, scentTotal: total }),
   setStatus: (s) => set({ missionStatus: s }),
   setDino: (info) =>
-    set({ dinoId: info.id, dinoName: info.name, era: info.era, region: info.region }),
+    set({
+      dinoId: info.id,
+      dinoName: info.name,
+      era: info.era,
+      region: info.region,
+      dinoStats: info.stats,
+      rank: info.rank,
+    }),
   startChase: () => set({ chaseActive: true, chasePercent: 1, chaseResult: null }),
   setChasePercent: (v) => set({ chasePercent: Math.max(0, Math.min(1, v)) }),
   endChase: (result, flashUntil) =>
     set({ chaseActive: false, chaseResult: result, chaseResultFlashUntil: flashUntil }),
-  reset: () => set({ ...initial }),
+  recordActivity: (r) =>
+    set((s) => ({
+      activityResults: [...s.activityResults, r],
+      predatorPointsEarned: s.predatorPointsEarned + r.points,
+    })),
+  reset: () => set({ ...initial, activityResults: [] }),
 }));
