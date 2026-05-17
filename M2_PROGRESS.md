@@ -183,6 +183,44 @@ The Missions button reloads the same level — no mission select screen
 exists yet (M4+). Acceptable: the user's brief explicitly says only one
 level for M2. Restart works correctly via reload.
 
-## Chunk 6 — localStorage save system
+## Chunk 6 — localStorage save system ✅
 
-Pending.
+- `src/progression/Save.ts` — versioned schema under
+  `localStorage["deadly-dinos:v1"]`:
+  ```
+  { version: 1, dinos: { <dinoId>: { predatorPoints, missions: { <missionId>: { completion, bestPoints, attempts, hiddenSecretsFound } }, unlockedStyles: [] } } }
+  ```
+  Read/write guards parse errors, privacy mode, and version mismatch
+  (treats any mismatch as an empty save — fine for v1). Exports
+  `loadSave`, `getDinoSave`, `getMissionSave`, `commitMissionResult`,
+  `wipeSave`. `commitMissionResult` keeps per-mission *best* completion
+  and *best* points, accumulates total predator points across attempts,
+  and reports back which fields were new bests.
+- `Game` loads `getDinoSave(EORAPTOR)` + `getMissionSave(L1)` on boot
+  into the store, and calls `commitMissionToSave()` on both `complete`
+  and `failed` transitions. The new-best flags from the commit flow
+  through to the store.
+- `gameState` extended with `totalPredatorPoints`,
+  `bestMissionCompletion`, `bestMissionPoints`, and `newBestCompletion`
+  / `newBestPoints` booleans plus their setters.
+- `ScoreSummary` now shows the persistent **Total**, the previous **Best
+  run**, and the best **completion %**, with `NEW BEST` badges when the
+  current run beat them. Reloading the page (via the buttons) re-reads
+  the same localStorage entry, so progress carries over.
+
+### Self-test
+
+- `npx tsc -b` — clean.
+- `npx vite build` — clean.
+- **MANUAL:** play through L1 once; check that the summary shows
+  `Total +<points>` and `Best run +<points>`. Reload, fail the mission
+  on purpose, confirm that the summary still shows the previous best
+  values (not the failed-run zero) and that `NEW BEST` only lights when
+  the new run actually beats the previous record.
+
+### Schema migration plan
+
+`version: 1` is the only supported version. Future schema changes should
+bump the constant and add a migration block in `readRaw`; for now any
+mismatch wipes to an empty save (safe because the only stored data so
+far is run-of-the-mill progress that the player can earn back quickly).

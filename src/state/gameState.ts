@@ -35,6 +35,17 @@ export interface MissionState {
   activityResults: ActivityResult[];
   predatorPointsEarned: number;
 
+  /** Persisted-aggregate predator points across all attempts of this dino. */
+  totalPredatorPoints: number;
+  /** Best completion% on this mission across all attempts (0..1). */
+  bestMissionCompletion: number;
+  /** Best single-run points on this mission. */
+  bestMissionPoints: number;
+  /** True if the run just stored was a new completion-% record. */
+  newBestCompletion: boolean;
+  /** True if the run just stored was a new points record. */
+  newBestPoints: boolean;
+
   chaseActive: boolean;
   chasePercent: number; // 0..1 timer remaining
   chaseResult: ChaseOutcome | null;
@@ -55,6 +66,12 @@ export interface MissionState {
   setChasePercent: (v: number) => void;
   endChase: (result: ChaseOutcome, flashUntil: number) => void;
   recordActivity: (r: ActivityResult) => void;
+  setPersistedTotals: (info: {
+    totalPredatorPoints: number;
+    bestMissionCompletion: number;
+    bestMissionPoints: number;
+  }) => void;
+  setNewBests: (info: { newBestCompletion: boolean; newBestPoints: boolean }) => void;
   reset: () => void;
 }
 
@@ -70,6 +87,8 @@ const initial: Omit<
   | "setChasePercent"
   | "endChase"
   | "recordActivity"
+  | "setPersistedTotals"
+  | "setNewBests"
   | "reset"
 > = {
   trackingPercent: 1,
@@ -84,6 +103,11 @@ const initial: Omit<
   rank: 1,
   activityResults: [],
   predatorPointsEarned: 0,
+  totalPredatorPoints: 0,
+  bestMissionCompletion: 0,
+  bestMissionPoints: 0,
+  newBestCompletion: false,
+  newBestPoints: false,
   chaseActive: false,
   chasePercent: 1,
   chaseResult: null,
@@ -113,5 +137,13 @@ export const useGameState = create<MissionState>((set) => ({
       activityResults: [...s.activityResults, r],
       predatorPointsEarned: s.predatorPointsEarned + r.points,
     })),
+  setPersistedTotals: (info) =>
+    set({
+      totalPredatorPoints: info.totalPredatorPoints,
+      bestMissionCompletion: info.bestMissionCompletion,
+      bestMissionPoints: info.bestMissionPoints,
+    }),
+  setNewBests: (info) =>
+    set({ newBestCompletion: info.newBestCompletion, newBestPoints: info.newBestPoints }),
   reset: () => set({ ...initial, activityResults: [] }),
 }));

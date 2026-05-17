@@ -11,6 +11,9 @@ import { TrackingSystem } from "../systems/TrackingSystem";
 import { ChaseSystem } from "../systems/ChaseSystem";
 import { EORAPTOR, trackingDuration } from "../data/dinosaurs";
 import { useGameState } from "../state/gameState";
+import { commitMissionResult, getDinoSave, getMissionSave } from "../progression/Save";
+
+const MISSION_ID = "L1_eoraptor";
 
 const JUMP_BUFFER_MS = 100;
 const NODE_REACH_RADIUS = 3.0;
@@ -99,6 +102,14 @@ export class Game {
     });
     state.setScentProgress(0, this.level.getScentTotal());
 
+    const dinoSave = getDinoSave(EORAPTOR.id);
+    const missionSave = getMissionSave(EORAPTOR.id, MISSION_ID);
+    state.setPersistedTotals({
+      totalPredatorPoints: dinoSave.predatorPoints,
+      bestMissionCompletion: missionSave.completion,
+      bestMissionPoints: missionSave.bestPoints,
+    });
+
     const duration = trackingDuration(EORAPTOR.stats, EORAPTOR.baseTrackingDuration);
     this.tracking = new TrackingSystem(duration, () => this.onMissionFail());
 
@@ -128,6 +139,29 @@ export class Game {
   private onMissionFail() {
     useGameState.getState().setStatus("failed");
     this.fx.titleSting();
+    this.commitMissionToSave();
+  }
+
+  private commitMissionToSave() {
+    const state = useGameState.getState();
+    const successes = state.activityResults.filter((a) => a.success).length;
+    const total = state.scentTotal;
+    const completion = total === 0 ? 0 : successes / total;
+    const result = commitMissionResult({
+      dinoId: EORAPTOR.id,
+      missionId: MISSION_ID,
+      completion,
+      pointsEarned: state.predatorPointsEarned,
+    });
+    state.setPersistedTotals({
+      totalPredatorPoints: result.totalPredatorPoints,
+      bestMissionCompletion: result.mission.completion,
+      bestMissionPoints: result.mission.bestPoints,
+    });
+    state.setNewBests({
+      newBestCompletion: result.isNewBestCompletion,
+      newBestPoints: result.isNewBestPoints,
+    });
   }
 
   start() {
@@ -224,6 +258,7 @@ export class Game {
     state.setScentProgress(collected, total);
     if (collected >= total) {
       state.setStatus("complete");
+      this.commitMissionToSave();
     } else if (success) {
       this.tracking.refill();
     }

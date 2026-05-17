@@ -129,6 +129,11 @@ export function ScoreSummary({ onRestart, onMissions }: ScoreSummaryProps) {
   const activities = useGameState((s) => s.activityResults);
   const points = useGameState((s) => s.predatorPointsEarned);
   const scentTotal = useGameState((s) => s.scentTotal);
+  const totalPredatorPoints = useGameState((s) => s.totalPredatorPoints);
+  const bestMissionCompletion = useGameState((s) => s.bestMissionCompletion);
+  const bestMissionPoints = useGameState((s) => s.bestMissionPoints);
+  const newBestCompletion = useGameState((s) => s.newBestCompletion);
+  const newBestPoints = useGameState((s) => s.newBestPoints);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -192,26 +197,46 @@ export function ScoreSummary({ onRestart, onMissions }: ScoreSummaryProps) {
           </ul>
         </div>
 
-        <div className="mt-5 flex items-center justify-between">
+        <div className="mt-5 flex items-end justify-between">
           <div>
-            <div className="font-ui text-[11px] tracking-widest text-white/55">PREDATOR POINTS</div>
+            <div className="font-ui text-[11px] tracking-widest text-white/55">
+              PREDATOR POINTS
+              {newBestPoints && (
+                <span className="ml-2 px-1.5 py-0.5 rounded text-amber-200 bg-amber-200/10 border border-amber-200/30">
+                  NEW BEST
+                </span>
+              )}
+            </div>
             <div className="font-display text-3xl text-amber-200 tracking-wider tabular-nums">
               +{points}
             </div>
+            <div className="mt-1 font-ui text-[11px] text-white/45 tracking-wider tabular-nums">
+              Total {totalPredatorPoints.toLocaleString()} · Best run +{bestMissionPoints}
+            </div>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={onMissions}
-              className="px-4 py-2 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 font-display tracking-wider text-white/85"
-            >
-              MISSIONS
-            </button>
-            <button
-              onClick={onRestart}
-              className="px-4 py-2 rounded-lg border border-rose-300/40 bg-rose-500/20 hover:bg-rose-500/30 font-display tracking-wider text-rose-100"
-            >
-              RESTART
-            </button>
+          <div className="flex flex-col items-end gap-2">
+            <div className="font-ui text-[11px] text-white/45 tracking-wider">
+              Best completion {Math.round(bestMissionCompletion * 100)}%
+              {newBestCompletion && (
+                <span className="ml-2 px-1.5 py-0.5 rounded text-amber-200 bg-amber-200/10 border border-amber-200/30">
+                  NEW BEST
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={onMissions}
+                className="px-4 py-2 rounded-lg border border-white/15 bg-white/5 hover:bg-white/10 font-display tracking-wider text-white/85"
+              >
+                MISSIONS
+              </button>
+              <button
+                onClick={onRestart}
+                className="px-4 py-2 rounded-lg border border-rose-300/40 bg-rose-500/20 hover:bg-rose-500/30 font-display tracking-wider text-rose-100"
+              >
+                RESTART
+              </button>
+            </div>
           </div>
         </div>
       </div>
