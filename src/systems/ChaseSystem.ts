@@ -1,5 +1,4 @@
 import * as THREE from "three";
-import gsap from "gsap";
 import { PreyAnimal } from "../entities/PreyAnimal";
 import { useGameState } from "../state/gameState";
 
@@ -15,6 +14,8 @@ const PREY_SPEED_RATIO = 0.82;
 const CATCH_RADIUS = 1.2;
 const PLAYER_MAX_SPEED = 5.0;
 const FLASH_DURATION_MS = 900;
+const LOSE_TAIL_SECONDS = 0.8;
+const WIN_RESOLVE_SECONDS = FLASH_DURATION_MS / 1000;
 
 export interface ChaseCallbacks {
   scene: THREE.Object3D;
@@ -28,10 +29,14 @@ export interface ChaseCallbacks {
 
 export class ChaseSystem {
   private active = false;
-  // Resolving covers the 0.9s still-frame window between catch and final cleanup.
-  // While resolving, isActive stays true so the proximity check in handleScentProgress
-  // does not re-trigger chase.start() and wedge the sequence forever.
+  // Resolving covers the still-frame window between catch (or timer expiry) and
+  // final cleanup. While resolving, isActive stays true so the proximity check
+  // in handleScentProgress does not re-trigger chase.start() and wedge the
+  // sequence forever. The countdown is driven by the game loop (chase.update)
+  // rather than gsap.delayedCall, so it survives any external ticker issue.
   private resolving = false;
+  private resolveTimeLeft = 0;
+  private pendingResult: "win" | "lose" | null = null;
   private prey: PreyAnimal | null = null;
   private timer = 0;
 
@@ -42,9 +47,14 @@ export class ChaseSystem {
   }
 
   start(scentNodeX: number, playerFacing: 1 | -1) {
-    if (this.active || this.resolving) return;
+    if (this.active || this.resolving) {
+      console.log(`[chase] start rejected: active=${this.active} resolving=${this.resolving}`);
+      return;
+    }
     this.active = true;
     this.resolving = false;
+    this.resolveTimeLeft = 0;
+    this.pendingResult = null;
     this.timer = CHASE_DURATION_SECONDS;
 
     this.prey = new PreyAnimal();
@@ -57,10 +67,19 @@ export class ChaseSystem {
     this.cb.onFOVPulse();
 
     useGameState.getState().startChase();
+    console.log(`[chase] start: node@${scentNodeX} facing=${playerFacing} prey@${spawnX} speed=${(playerFacing * PLAYER_MAX_SPEED * PREY_SPEED_RATIO).toFixed(2)} timer=${this.timer}`);
   }
 
   update(dt: number, playerPosition: THREE.Vector3) {
-    if (!this.active || this.resolving || !this.prey) return;
+    if (this.resolving) {
+      this.resolveTimeLeft -= dt;
+      if (this.resolveTimeLeft <= 0 && this.pendingResult !== null) {
+        this.finalize(this.pendingResult);
+      }
+      return;
+    }
+
+    if (!this.active || !this.prey) return;
 
     this.prey.update(dt);
     this.cb.setChevronOverride(this.prey.position.x);
@@ -80,30 +99,34 @@ export class ChaseSystem {
   }
 
   private resolve(result: "win" | "lose") {
-    if (!this.active || this.resolving || !this.prey) return;
+    if (!this.active || this.resolving || !this.prey) {
+      console.log(`[chase] resolve rejected: active=${this.active} resolving=${this.resolving} prey=${!!this.prey}`);
+      return;
+    }
+    console.log(`[chase] resolve(${result}): entering ${result === "win" ? WIN_RESOLVE_SECONDS : LOSE_TAIL_SECONDS}s wind-down`);
     this.resolving = true;
+    this.pendingResult = result;
+    this.resolveTimeLeft = result === "win" ? WIN_RESOLVE_SECONDS : LOSE_TAIL_SECONDS;
     const flashUntil = performance.now() + FLASH_DURATION_MS;
     useGameState.getState().endChase(result, flashUntil);
-
-    const finalize = () => {
-      this.cleanup();
-      this.cb.onFOVReset();
-      this.active = false;
-      this.resolving = false;
-      this.onResolved?.(result);
-    };
 
     if (result === "win") {
       this.cb.onCameraShake(0.18, 0.1);
       this.cb.onGlitchSting();
       this.cb.setPlayerInputLocked(true);
-      gsap.delayedCall(FLASH_DURATION_MS / 1000, () => {
-        this.cb.setPlayerInputLocked(false);
-        finalize();
-      });
-    } else {
-      gsap.delayedCall(0.8, finalize);
     }
+  }
+
+  private finalize(result: "win" | "lose") {
+    console.log(`[chase] finalize: cleanup + flags reset + onResolved(${result})`);
+    this.cleanup();
+    this.cb.onFOVReset();
+    if (result === "win") this.cb.setPlayerInputLocked(false);
+    this.active = false;
+    this.resolving = false;
+    this.pendingResult = null;
+    this.resolveTimeLeft = 0;
+    this.onResolved?.(result);
   }
 
   private cleanup() {

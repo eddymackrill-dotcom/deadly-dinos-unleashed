@@ -180,6 +180,11 @@ export function createLevel1(): Level {
   let activeIndex = 0;
   if (nodes.length > 0) nodes[0].setActive(true);
 
+  console.log(
+    `[level] L1 nodes:`,
+    nodes.map((n, i) => `#${i} (${n.tag}) @ x=${n.position.x}`).join(", "),
+  );
+
   const chevron = new Chevron();
   root.add(chevron.root);
   let chevronOverrideX: number | null = null;
@@ -215,9 +220,16 @@ export function createLevel1(): Level {
     },
     collectActive() {
       if (activeIndex >= nodes.length) return;
+      const prevIndex = activeIndex;
       nodes[activeIndex].collect();
       activeIndex++;
       syncActive();
+      console.log(
+        `[level] collectActive: ${prevIndex} -> ${activeIndex}` +
+          (activeIndex < nodes.length
+            ? ` (next active: node #${activeIndex} ${nodes[activeIndex].tag} @ x=${nodes[activeIndex].position.x})`
+            : ` (sequence done)`),
+      );
     },
     setChevronTargetOverride(x) {
       chevronOverrideX = x;

@@ -27,7 +27,13 @@ export class ScentNode {
   }
 
   setActive(active: boolean) {
-    this.particles.setActive(active && !this._collected);
+    const effective = active && !this._collected;
+    this.particles.setActive(effective);
+    if (active) {
+      console.log(
+        `[node] setActive(true) @ x=${this.position.x} tag=${this.tag} collected=${this._collected} -> particles visible=${effective}`,
+      );
+    }
   }
 
   collect() {

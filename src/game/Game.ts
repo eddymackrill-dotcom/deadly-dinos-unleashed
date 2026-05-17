@@ -70,6 +70,8 @@ export class Game {
   private chase: ChaseSystem;
   private inputLocked = false;
   private chasePendingResult: "win" | "lose" | null = null;
+  private scentLogFrame = 0;
+  private lastLoggedActiveIndex: number | null = null;
   readonly fx: GameFX;
   private rafId: number | null = null;
   private running = false;
@@ -125,6 +127,7 @@ export class Game {
       },
     });
     this.chase.onResolved = (result) => {
+      console.log(`[chase] onResolved fired with result=${result}; queued for next frame`);
       this.chasePendingResult = result;
     };
 
@@ -216,25 +219,45 @@ export class Game {
   };
 
   private handleScentProgress() {
-    if (this.chase.isActive) return;
+    const active = this.level.getActiveScent();
+    const px = this.player.position.x;
+    const chaseActive = this.chase.isActive;
+    const pending = this.chasePendingResult;
 
-    if (this.chasePendingResult !== null) {
-      const result = this.chasePendingResult;
+    // Log once every 30 frames (~0.5s), and immediately when the active node changes.
+    this.scentLogFrame++;
+    const activeIdx = active?.index ?? null;
+    const indexChanged = activeIdx !== this.lastLoggedActiveIndex;
+    if (indexChanged || this.scentLogFrame % 30 === 0) {
+      const dx = active ? active.position.x - px : Infinity;
+      console.log(
+        `[scent.tick] player.x=${px.toFixed(2)} active=${
+          active ? `#${active.index}(${active.tag})@x=${active.position.x}` : "none"
+        } dx=${Number.isFinite(dx) ? dx.toFixed(2) : "n/a"} chase.isActive=${chaseActive} pending=${pending}`,
+      );
+      this.lastLoggedActiveIndex = activeIdx;
+    }
+
+    if (chaseActive) return;
+
+    if (pending !== null) {
+      console.log(`[scent] draining chasePendingResult=${pending} -> completeActivity`);
       this.chasePendingResult = null;
-      this.completeActivity(result === "win");
+      this.completeActivity(pending === "win");
       return;
     }
 
-    const active = this.level.getActiveScent();
     if (!active) return;
 
-    const dx = active.position.x - this.player.position.x;
+    const dx = active.position.x - px;
     if (Math.abs(dx) > NODE_REACH_RADIUS) return;
 
     if (active.tag === "chase") {
       const facing: 1 | -1 = this.player.velocityX >= 0 ? 1 : -1;
+      console.log(`[scent] within reach of chase node #${active.index}; calling chase.start(${active.position.x}, ${facing})`);
       this.chase.start(active.position.x, facing);
     } else {
+      console.log(`[scent] within reach of collect node #${active.index}; calling completeActivity(true)`);
       this.completeActivity(true);
     }
   }
