@@ -4,8 +4,6 @@ import { ParallaxBackground } from "./ParallaxBackground";
 import { ScentNode } from "../entities/ScentNode";
 import { Chevron } from "../entities/Chevron";
 
-const NODE_REACH_RADIUS = 3.0;
-
 const NODE_SEQUENCE: Array<{ x: number; tag: ScentNodeTag }> = [
   { x: 12, tag: "collect" },
   { x: 28, tag: "chase" },
@@ -184,6 +182,7 @@ export function createLevel1(): Level {
 
   const chevron = new Chevron();
   root.add(chevron.root);
+  let chevronOverrideX: number | null = null;
 
   function syncActive() {
     nodes.forEach((n, i) => n.setActive(i === activeIndex));
@@ -201,22 +200,27 @@ export function createLevel1(): Level {
       parallax.update(camera.position.x);
       for (const n of nodes) n.update(dt, camera.quaternion);
 
-      if (activeIndex < nodes.length) {
-        const active = nodes[activeIndex];
-        chevron.setTargetX(active.position.x);
+      if (chevronOverrideX !== null) {
+        chevron.setTargetX(chevronOverrideX);
         chevron.update(playerPosition.x, playerPosition.y, camera, dt);
-        const dx = active.position.x - playerPosition.x;
-        if (Math.abs(dx) <= NODE_REACH_RADIUS) {
-          active.collect();
-          activeIndex++;
-          syncActive();
-        }
+      } else if (activeIndex < nodes.length) {
+        chevron.setTargetX(nodes[activeIndex].position.x);
+        chevron.update(playerPosition.x, playerPosition.y, camera, dt);
       } else {
         chevron.setTargetX(null);
       }
     },
     getActiveScent() {
       return getActive();
+    },
+    collectActive() {
+      if (activeIndex >= nodes.length) return;
+      nodes[activeIndex].collect();
+      activeIndex++;
+      syncActive();
+    },
+    setChevronTargetOverride(x) {
+      chevronOverrideX = x;
     },
     getScentTotal() {
       return nodes.length;

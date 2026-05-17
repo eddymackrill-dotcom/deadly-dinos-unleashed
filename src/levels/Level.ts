@@ -19,6 +19,10 @@ export interface Level {
   update(ctx: LevelUpdateContext): void;
   /** Returns the next-uncollected scent node, or null when the sequence is complete. */
   getActiveScent(): ActiveScentInfo | null;
+  /** Mark the currently-active scent node collected and advance to the next. No-op if already complete. */
+  collectActive(): void;
+  /** Override the chevron's target X (e.g. point at chase prey instead of next scent node). Pass null to restore default. */
+  setChevronTargetOverride(x: number | null): void;
   /** Total scent nodes in the level. */
   getScentTotal(): number;
   /** Number of scent nodes already collected. */

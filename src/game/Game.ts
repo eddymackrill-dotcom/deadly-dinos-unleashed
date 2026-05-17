@@ -8,10 +8,13 @@ import { createLevel1 } from "../levels/L1_Eoraptor";
 import type { Level } from "../levels/Level";
 import { Dinosaur } from "../entities/Dinosaur";
 import { TrackingSystem } from "../systems/TrackingSystem";
+import { ChaseSystem } from "../systems/ChaseSystem";
 import { EORAPTOR, trackingDuration } from "../data/dinosaurs";
 import { useGameState } from "../state/gameState";
 
 const JUMP_BUFFER_MS = 100;
+const NODE_REACH_RADIUS = 3.0;
+const CHASE_FOV = 28;
 
 export class GameFX {
   constructor(private intensityRef: { value: number }) {}
@@ -26,6 +29,16 @@ export class GameFX {
       .to(this.intensityRef, { value: 0.003, duration: 2.4 })
       .to(this.intensityRef, { value: 0, duration: 0.4, ease: "power2.in" });
   }
+
+  catchSting() {
+    gsap.killTweensOf(this.intensityRef);
+    gsap
+      .timeline()
+      .set(this.intensityRef, { value: 0 })
+      .to(this.intensityRef, { value: 0.012, duration: 0.05, ease: "power2.out" })
+      .to(this.intensityRef, { value: 0.004, duration: 0.15, ease: "power2.in" })
+      .to(this.intensityRef, { value: 0, duration: 0.5, ease: "power2.in" });
+  }
 }
 
 export class Game {
@@ -37,7 +50,9 @@ export class Game {
   private input: Input;
   private postProcess: PostProcess;
   private tracking: TrackingSystem;
-  private lastScentCollected = 0;
+  private chase: ChaseSystem;
+  private inputLocked = false;
+  private chasePendingResult: "win" | "lose" | null = null;
   readonly fx: GameFX;
   private rafId: number | null = null;
   private running = false;
@@ -71,6 +86,21 @@ export class Game {
     const duration = trackingDuration(EORAPTOR.stats, EORAPTOR.baseTrackingDuration);
     this.tracking = new TrackingSystem(duration, () => this.onMissionFail());
 
+    this.chase = new ChaseSystem({
+      scene: this.scene.scene,
+      setChevronOverride: (x) => this.level.setChevronTargetOverride(x),
+      onCameraShake: (mag, dur) => this.camera.shake(mag, dur),
+      onFOVPulse: () => this.camera.setFOV(CHASE_FOV, 0.5),
+      onFOVReset: () => this.camera.resetFOV(0.5),
+      onGlitchSting: () => this.fx.catchSting(),
+      setPlayerInputLocked: (locked) => {
+        this.inputLocked = locked;
+      },
+    });
+    this.chase.onResolved = (result) => {
+      this.chasePendingResult = result;
+    };
+
     void this.player.load({
       url: "/models/eoraptor.glb",
       targetHeight: 0.8,
@@ -103,17 +133,22 @@ export class Game {
     if (!this.running) return;
     const dt = Math.min(this.clock.getDelta(), 1 / 30);
 
-    this.player.setMoveInput(this.input.dir);
+    this.player.setMoveInput(this.inputLocked ? 0 : this.input.dir);
 
-    const jumpAgeMs = performance.now() - this.input.jumpPressedAt();
-    if (jumpAgeMs <= JUMP_BUFFER_MS && this.player.canJumpNow()) {
-      if (this.player.tryJump()) {
-        this.input.consumeJumpPress();
+    if (!this.inputLocked) {
+      const jumpAgeMs = performance.now() - this.input.jumpPressedAt();
+      if (jumpAgeMs <= JUMP_BUFFER_MS && this.player.canJumpNow()) {
+        if (this.player.tryJump()) {
+          this.input.consumeJumpPress();
+        }
       }
     }
 
     this.player.update(dt);
     this.camera.update(dt);
+
+    this.chase.update(dt, this.player.position);
+
     this.level.update({
       dt,
       camera: this.camera.camera,
@@ -122,23 +157,51 @@ export class Game {
 
     const state = useGameState.getState();
     if (state.missionStatus === "playing") {
-      const collected = this.level.getScentCollected();
-      const total = this.level.getScentTotal();
-      if (collected !== this.lastScentCollected) {
-        this.lastScentCollected = collected;
-        state.setScentProgress(collected, total);
-        if (collected >= total) {
-          state.setStatus("complete");
-        } else {
-          this.tracking.refill();
-        }
-      }
+      this.handleScentProgress();
       this.tracking.tick(dt);
     }
 
     this.postProcess.render();
     this.rafId = requestAnimationFrame(this.loop);
   };
+
+  private handleScentProgress() {
+    if (this.chase.isActive) return;
+
+    // Drain any pending chase resolution first (collects the node + handles refill rules).
+    if (this.chasePendingResult !== null) {
+      const result = this.chasePendingResult;
+      this.chasePendingResult = null;
+      this.completeActivity(result === "win");
+      return;
+    }
+
+    const active = this.level.getActiveScent();
+    if (!active) return;
+
+    const dx = active.position.x - this.player.position.x;
+    if (Math.abs(dx) > NODE_REACH_RADIUS) return;
+
+    if (active.tag === "chase") {
+      const facing: 1 | -1 = this.player.velocityX >= 0 ? 1 : -1;
+      this.chase.start(active.position.x, facing);
+    } else {
+      this.completeActivity(true);
+    }
+  }
+
+  private completeActivity(success: boolean) {
+    this.level.collectActive();
+    const state = useGameState.getState();
+    const collected = this.level.getScentCollected();
+    const total = this.level.getScentTotal();
+    state.setScentProgress(collected, total);
+    if (collected >= total) {
+      state.setStatus("complete");
+    } else if (success) {
+      this.tracking.refill();
+    }
+  }
 
   dispose() {
     this.stop();

@@ -103,9 +103,50 @@ up better with the desired effect.
   node, turns rose-pulse below 25%, and triggers the fail card if the
   player stands still for ~31s.
 
-## Chunk 4 — Chase mechanic
+## Chunk 4 — Chase mechanic ✅
 
-Pending.
+- `src/entities/PreyAnimal.ts` — procedural two-tone box with a small
+  head and a sin-driven hop while running. (The brief explicitly says
+  procedural placeholder; roster sourcing is deferred to post-M2.)
+- `src/systems/ChaseSystem.ts` — manages active chase state via a
+  callbacks bag (scene, chevron override, camera shake, FOV pulse,
+  glitch sting, input lock). On start: spawns prey 6 units ahead in the
+  player's facing direction, runs at `5.0 * 0.9 = 4.5 u/s`, widens FOV
+  25° → 28°, starts a 6s timer, retargets the chevron. On catch
+  (overlap ≤ 1.1u): camera shake (mag 0.18, 100ms), chromatic-aberration
+  catch-sting, input lock, CAUGHT! flash. On timer expiry: ESCAPED
+  fade; tracking continues without refill (per spec).
+- `Camera` gained `shake(magnitude, duration)` (decaying random offset
+  layered onto the smoothed follow) and `setFOV` / `resetFOV` (GSAP
+  tween of `camera.fov` + `updateProjectionMatrix()`).
+- `Game` now orchestrates activity flow:
+  - Proximity check (≤3u from active node) moved out of `L1` into
+    `Game.handleScentProgress`.
+  - `collect` tag → `completeActivity(true)` (refill + advance).
+  - `chase` tag → `chase.start()`; on resolve, `completeActivity(win)`
+    — only `win` triggers a tracking refill (lose: bar continues to
+    drain into the next node, per spec).
+  - Input locked during the catch-sting flash (~900ms) so the player
+    can't run off mid-still-frame.
+- `Level` interface gained `collectActive()` and
+  `setChevronTargetOverride(x)` so the level keeps owning its visual
+  state while the orchestrator drives sequencing.
+- `gameState` adds `chaseActive` / `chasePercent` / `chaseResult` /
+  `chaseResultFlashUntil`. HUD adds:
+  - Chase timer bar at top-center, gold→rose gradient.
+  - `CAUGHT!` / `ESCAPED` full-screen flash card with chromatic-glitch
+    text shadow, auto-clears via `chaseResultFlashUntil`.
+- `GameFX.catchSting()` is a faster, stronger glitch spike (peak 0.012)
+  separate from the title sting.
+
+### Self-test
+
+- `npx tsc -b` — clean.
+- `npx vite build` — clean.
+- **MANUAL:** walk into the chase node at x=28. Verify FOV widens, prey
+  spawns ahead and runs forward at ~90% player speed, timer bar fills
+  and drains, CAUGHT! flash + shake on overlap, ESCAPED if you stop
+  chasing.
 
 ## Chunk 5 — Score summary screen
 

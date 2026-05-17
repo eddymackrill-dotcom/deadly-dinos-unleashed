@@ -83,11 +83,79 @@ function MissionCompleteCard() {
   );
 }
 
+function ChaseTimerBar() {
+  const active = useGameState((s) => s.chaseActive);
+  const pct = useGameState((s) => s.chasePercent);
+  if (!active) return null;
+  const danger = pct < 0.3;
+  return (
+    <div className="absolute top-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 pointer-events-none select-none">
+      <div className="font-display text-rose-100 text-lg tracking-[0.3em] drop-shadow">
+        CHASE
+      </div>
+      <div className="relative h-3 w-72 bg-black/55 rounded-full overflow-hidden border border-white/15">
+        <div
+          className="absolute left-0 top-0 bottom-0 transition-[width] duration-75 ease-linear"
+          style={{
+            width: `${pct * 100}%`,
+            background: danger
+              ? "linear-gradient(90deg, #ffae42, #ff4d6a)"
+              : "linear-gradient(90deg, #ffd166, #ff8e6a)",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ChaseResultFlash() {
+  const result = useGameState((s) => s.chaseResult);
+  const flashUntil = useGameState((s) => s.chaseResultFlashUntil);
+  const [now, setNow] = useState(() => performance.now());
+
+  useEffect(() => {
+    if (flashUntil <= performance.now()) return;
+    let raf = 0;
+    const tick = () => {
+      setNow(performance.now());
+      if (performance.now() < flashUntil) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [flashUntil]);
+
+  if (result === null || now >= flashUntil) return null;
+  const isWin = result === "win";
+  return (
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div
+        className="absolute inset-0"
+        style={{
+          background: isWin
+            ? "radial-gradient(circle, rgba(255,200,255,0.25), rgba(0,0,0,0.45))"
+            : "radial-gradient(circle, rgba(120,120,160,0.15), rgba(0,0,0,0.55))",
+        }}
+      />
+      <div className="relative text-center select-none px-8 py-6">
+        <div
+          className={`text-7xl font-display tracking-widest title-glitch ${
+            isWin ? "text-rose-100" : "text-slate-200"
+          }`}
+        >
+          {isWin ? "CAUGHT!" : "ESCAPED"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HUD() {
   const status = useGameState((s) => s.missionStatus);
   return (
     <>
       <TrackingBar />
+      <ChaseTimerBar />
+      <ChaseResultFlash />
       {status === "failed" && <MissionFailCard />}
       {status === "complete" && <MissionCompleteCard />}
     </>
