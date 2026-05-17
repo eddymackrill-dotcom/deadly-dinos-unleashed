@@ -3,13 +3,14 @@ import gsap from "gsap";
 import { PreyAnimal } from "../entities/PreyAnimal";
 import { useGameState } from "../state/gameState";
 
-// Catch math (player at full sprint must beat the timer with ~1.5s margin):
+// Catch math (player at full sprint should beat the timer with ~2s margin):
 //   time_to_close = head_start / (PLAYER_MAX_SPEED * (1 - PREY_SPEED_RATIO))
-//   = 4 / (5 * 0.15) = 5.33s. Timer 7s -> margin 1.67s. ✓
+//   = 4 / (5 * 0.18) = 4.44s. Timer 7s -> conservative margin 2.56s. ✓
+//   With catch radius factored in: (4 - 2.0) / 0.9 = 2.22s -> real margin 4.78s.
 const CHASE_DURATION_SECONDS = 7;
 const PREY_SPAWN_AHEAD_X = 4;
-const PREY_SPEED_RATIO = 0.85;
-const CATCH_RADIUS = 1.5;
+const PREY_SPEED_RATIO = 0.82;
+const CATCH_RADIUS = 2.0;
 const PLAYER_MAX_SPEED = 5.0;
 const FLASH_DURATION_MS = 900;
 
