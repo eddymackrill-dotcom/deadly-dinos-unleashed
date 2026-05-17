@@ -16,16 +16,13 @@ function TrackingBar() {
   const scentTotal = useGameState((s) => s.scentTotal);
   const status = useGameState((s) => s.missionStatus);
 
-  const prevScentRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (prevScentRef.current !== scentCollected) {
-      console.log(`[hud] TrackingBar read scentCollected=${scentCollected} / ${scentTotal}`);
-      prevScentRef.current = scentCollected;
-    }
-  }, [scentCollected, scentTotal]);
-
   const pct = Math.max(0, Math.min(1, trackingPercent));
   const danger = pct < 0.25;
+
+  // Per spec: while there are uncollected nodes, display "SCENT n/total" where
+  // n is the 1-indexed active (i.e. next-to-collect) node. After all are
+  // collected, show n=total.
+  const activeOrdinal = Math.min(scentCollected + 1, scentTotal);
   const barColor =
     status === "complete"
       ? "linear-gradient(90deg, #62d99a, #a5f0c4)"
@@ -56,7 +53,7 @@ function TrackingBar() {
         </div>
       </div>
       <div className="font-ui text-xs text-white/70 tracking-wide">
-        SCENT {scentCollected} / {scentTotal}
+        SCENT {activeOrdinal} / {scentTotal}
       </div>
     </div>
   );

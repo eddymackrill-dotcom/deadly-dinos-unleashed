@@ -1,44 +1,23 @@
 import * as THREE from "three";
 import { ScentParticles } from "./ScentParticles";
-import type { ScentNodeTag } from "../levels/Level";
 
-export interface ScentNodeConfig {
-  position: THREE.Vector3;
-  tag: ScentNodeTag;
-}
-
-/** A waypoint in the scent sequence. Owns its own particle emitter; visible only when active. */
+/**
+ * Visual for one scent waypoint — just the particle emitter at a position.
+ * Collection state lives in ScentSequence; this entity is "view-only".
+ */
 export class ScentNode {
   readonly position: THREE.Vector3;
-  readonly tag: ScentNodeTag;
   readonly particles: ScentParticles;
-  private _collected = false;
 
-  constructor(cfg: ScentNodeConfig) {
-    this.position = cfg.position.clone();
-    this.tag = cfg.tag;
+  constructor(position: THREE.Vector3) {
+    this.position = position.clone();
     this.particles = new ScentParticles();
     this.particles.setPosition(this.position.x, this.position.y, this.position.z);
     this.particles.setActive(false);
   }
 
-  get collected(): boolean {
-    return this._collected;
-  }
-
-  setActive(active: boolean) {
-    const effective = active && !this._collected;
-    this.particles.setActive(effective);
-    if (active) {
-      console.log(
-        `[node] setActive(true) @ x=${this.position.x} tag=${this.tag} collected=${this._collected} -> particles visible=${effective}`,
-      );
-    }
-  }
-
-  collect() {
-    this._collected = true;
-    this.particles.setActive(false);
+  setVisible(visible: boolean) {
+    this.particles.setActive(visible);
   }
 
   update(dt: number, cameraQuaternion: THREE.Quaternion) {

@@ -1,6 +1,13 @@
 import "./styles.css";
 import { Game } from "./game/Game";
 import { mountUI } from "./ui/App";
+import { runScentSequenceSelfTest } from "./levels/ScentSequence";
+
+if (import.meta.env.DEV) {
+  // Throws if the state machine drifts from the spec. Fails the dev session
+  // loudly rather than letting a broken sequence reach the player.
+  runScentSequenceSelfTest();
+}
 
 const canvas = document.getElementById("game-canvas") as HTMLCanvasElement | null;
 const uiRoot = document.getElementById("ui-root");

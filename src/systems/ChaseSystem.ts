@@ -4,10 +4,8 @@ import { useGameState } from "../state/gameState";
 
 // Catch math (player at full sprint should beat the timer with ~1.5s margin):
 //   time_to_close = head_start / (PLAYER_MAX_SPEED * (1 - PREY_SPEED_RATIO))
-//   = 4 / (5 * 0.18) = 4.44s. Timer 7s -> conservative margin 2.56s. ✓
-//   With catch radius factored in: (4 - 1.2) / 0.9 = 3.11s -> real margin 3.89s.
-//   Hitbox tightened from 2.0 -> 1.2 after playtest reported catches firing
-//   when the player was visibly a couple of units short of the prey.
+//   = 4 / (5 * 0.18) = 4.44s. Timer 7s -> conservative margin 2.56s.
+//   With catch radius: (4 - 1.2) / 0.9 = 3.11s -> real margin 3.89s.
 const CHASE_DURATION_SECONDS = 7;
 const PREY_SPAWN_AHEAD_X = 4;
 const PREY_SPEED_RATIO = 0.82;
@@ -27,38 +25,40 @@ export interface ChaseCallbacks {
   setPlayerInputLocked: (locked: boolean) => void;
 }
 
+type ChasePhase = "idle" | "running" | "resolving";
+
+/**
+ * Visual + input runner for a chase encounter. Knows nothing about the scent
+ * sequence — when the encounter ends, it calls `onResolved` with the outcome,
+ * and the orchestrator decides what to do (mark the node collected, advance
+ * the sequence, refill tracking, etc.).
+ *
+ * Resolution timing is game-loop driven (not gsap.delayedCall) so the
+ * countdown can't silently fail to fire if gsap's ticker hiccups.
+ */
 export class ChaseSystem {
-  private active = false;
-  // Resolving covers the still-frame window between catch (or timer expiry) and
-  // final cleanup. While resolving, isActive stays true so the proximity check
-  // in handleScentProgress does not re-trigger chase.start() and wedge the
-  // sequence forever. The countdown is driven by the game loop (chase.update)
-  // rather than gsap.delayedCall, so it survives any external ticker issue.
-  private resolving = false;
-  private resolveTimeLeft = 0;
-  private pendingResult: "win" | "lose" | null = null;
+  private phase: ChasePhase = "idle";
   private prey: PreyAnimal | null = null;
   private timer = 0;
+  private resolveTimeLeft = 0;
+  private pendingResult: "win" | "lose" | null = null;
 
   constructor(private cb: ChaseCallbacks) {}
 
-  get isActive() {
-    return this.active || this.resolving;
+  /** True from chase start through final cleanup (covers the still-frame window). */
+  get isActive(): boolean {
+    return this.phase !== "idle";
   }
 
-  start(scentNodeX: number, playerFacing: 1 | -1) {
-    if (this.active || this.resolving) {
-      console.log(`[chase] start rejected: active=${this.active} resolving=${this.resolving}`);
-      return;
-    }
-    this.active = true;
-    this.resolving = false;
+  start(nodeX: number, playerFacing: 1 | -1) {
+    if (this.phase !== "idle") return;
+    this.phase = "running";
+    this.timer = CHASE_DURATION_SECONDS;
     this.resolveTimeLeft = 0;
     this.pendingResult = null;
-    this.timer = CHASE_DURATION_SECONDS;
 
     this.prey = new PreyAnimal();
-    const spawnX = scentNodeX + playerFacing * PREY_SPAWN_AHEAD_X;
+    const spawnX = nodeX + playerFacing * PREY_SPAWN_AHEAD_X;
     this.prey.setPosition(spawnX, 0, 0);
     this.prey.setRunSpeed(playerFacing * PLAYER_MAX_SPEED * PREY_SPEED_RATIO);
     this.cb.scene.add(this.prey.root);
@@ -67,11 +67,10 @@ export class ChaseSystem {
     this.cb.onFOVPulse();
 
     useGameState.getState().startChase();
-    console.log(`[chase] start: node@${scentNodeX} facing=${playerFacing} prey@${spawnX} speed=${(playerFacing * PLAYER_MAX_SPEED * PREY_SPEED_RATIO).toFixed(2)} timer=${this.timer}`);
   }
 
   update(dt: number, playerPosition: THREE.Vector3) {
-    if (this.resolving) {
+    if (this.phase === "resolving") {
       this.resolveTimeLeft -= dt;
       if (this.resolveTimeLeft <= 0 && this.pendingResult !== null) {
         this.finalize(this.pendingResult);
@@ -79,7 +78,7 @@ export class ChaseSystem {
       return;
     }
 
-    if (!this.active || !this.prey) return;
+    if (this.phase !== "running" || !this.prey) return;
 
     this.prey.update(dt);
     this.cb.setChevronOverride(this.prey.position.x);
@@ -89,22 +88,16 @@ export class ChaseSystem {
 
     const dx = this.prey.position.x - playerPosition.x;
     if (Math.abs(dx) <= CATCH_RADIUS) {
-      this.resolve("win");
+      this.beginResolve("win");
       return;
     }
-
     if (this.timer <= 0) {
-      this.resolve("lose");
+      this.beginResolve("lose");
     }
   }
 
-  private resolve(result: "win" | "lose") {
-    if (!this.active || this.resolving || !this.prey) {
-      console.log(`[chase] resolve rejected: active=${this.active} resolving=${this.resolving} prey=${!!this.prey}`);
-      return;
-    }
-    console.log(`[chase] resolve(${result}): entering ${result === "win" ? WIN_RESOLVE_SECONDS : LOSE_TAIL_SECONDS}s wind-down`);
-    this.resolving = true;
+  private beginResolve(result: "win" | "lose") {
+    this.phase = "resolving";
     this.pendingResult = result;
     this.resolveTimeLeft = result === "win" ? WIN_RESOLVE_SECONDS : LOSE_TAIL_SECONDS;
     const flashUntil = performance.now() + FLASH_DURATION_MS;
@@ -118,24 +111,18 @@ export class ChaseSystem {
   }
 
   private finalize(result: "win" | "lose") {
-    console.log(`[chase] finalize: cleanup + flags reset + onResolved(${result})`);
-    this.cleanup();
-    this.cb.onFOVReset();
-    if (result === "win") this.cb.setPlayerInputLocked(false);
-    this.active = false;
-    this.resolving = false;
-    this.pendingResult = null;
-    this.resolveTimeLeft = 0;
-    this.onResolved?.(result);
-  }
-
-  private cleanup() {
     if (this.prey) {
       this.cb.scene.remove(this.prey.root);
       this.prey.dispose();
       this.prey = null;
     }
     this.cb.setChevronOverride(null);
+    this.cb.onFOVReset();
+    if (result === "win") this.cb.setPlayerInputLocked(false);
+    this.phase = "idle";
+    this.pendingResult = null;
+    this.resolveTimeLeft = 0;
+    this.onResolved?.(result);
   }
 
   onResolved: ((result: "win" | "lose") => void) | null = null;

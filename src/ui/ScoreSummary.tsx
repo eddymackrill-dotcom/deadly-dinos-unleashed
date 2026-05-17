@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
-import { useGameState, type ActivityTag, type ActivityResult, type DinoStatsView } from "../state/gameState";
+import { useGameState, type ScentResultView, type DinoStatsView } from "../state/gameState";
+import type { ScentNodeType } from "../levels/ScentSequence";
 
-const STAT_MAX = 12; // matches CLAUDE.md stat scale (1..12)
+const STAT_MAX = 12;
 
-const ACTIVITY_LABELS: Record<ActivityTag, string> = {
+const NODE_LABELS: Record<ScentNodeType, string> = {
   collect: "Scent Trail",
   chase: "Chase",
   stealth: "Stealth Hunt",
@@ -87,25 +88,26 @@ function RankShield({ rank }: { rank: number }) {
   );
 }
 
-function ActivityRow({ r, index }: { r: ActivityResult; index: number }) {
-  const label = ACTIVITY_LABELS[r.tag];
+function ResultRow({ r, ordinal }: { r: ScentResultView; ordinal: number }) {
+  const success = r.outcome === "win";
+  const label = NODE_LABELS[r.type];
   return (
     <li className="flex items-center justify-between gap-3 py-1.5 border-b border-white/5 last:border-b-0">
       <div className="flex items-center gap-2">
         <div
           className={`w-5 h-5 flex items-center justify-center rounded-full text-[11px] font-display ${
-            r.success ? "bg-emerald-400/30 text-emerald-100" : "bg-rose-400/30 text-rose-100"
+            success ? "bg-emerald-400/30 text-emerald-100" : "bg-rose-400/30 text-rose-100"
           }`}
         >
-          {r.success ? "✓" : "×"}
+          {success ? "✓" : "×"}
         </div>
         <div className="font-ui text-sm text-white/85">
-          {index + 1}. {label}
+          {ordinal}. {label}
         </div>
       </div>
       <div
         className={`font-display tabular-nums text-sm tracking-wider ${
-          r.success ? "text-amber-200" : "text-white/40"
+          success ? "text-amber-200" : "text-white/40"
         }`}
       >
         +{r.points}
@@ -126,7 +128,7 @@ export function ScoreSummary({ onRestart, onMissions }: ScoreSummaryProps) {
   const region = useGameState((s) => s.region);
   const stats = useGameState((s) => s.dinoStats);
   const rank = useGameState((s) => s.rank);
-  const activities = useGameState((s) => s.activityResults);
+  const results = useGameState((s) => s.scentResults);
   const points = useGameState((s) => s.predatorPointsEarned);
   const scentTotal = useGameState((s) => s.scentTotal);
   const totalPredatorPoints = useGameState((s) => s.totalPredatorPoints);
@@ -147,7 +149,7 @@ export function ScoreSummary({ onRestart, onMissions }: ScoreSummaryProps) {
 
   if (status !== "complete" && status !== "failed") return null;
 
-  const successCount = activities.filter((a) => a.success).length;
+  const successCount = results.filter((r) => r.outcome === "win").length;
   const completion = scentTotal === 0 ? 0 : successCount / scentTotal;
   const headline = status === "complete" ? "MISSION COMPLETE" : "MISSION FAILED";
   const headlineColor = status === "complete" ? "text-emerald-200" : "text-rose-300";
@@ -189,10 +191,10 @@ export function ScoreSummary({ onRestart, onMissions }: ScoreSummaryProps) {
         <div className="mt-5">
           <div className="font-display tracking-widest text-xs text-white/70 mb-2">ACTIVITIES</div>
           <ul className="bg-black/30 rounded-lg px-3 py-2">
-            {activities.length === 0 ? (
+            {results.length === 0 ? (
               <li className="font-ui text-sm text-white/40 py-2">No activities completed.</li>
             ) : (
-              activities.map((a, i) => <ActivityRow key={i} r={a} index={i} />)
+              results.map((r) => <ResultRow key={r.index} r={r} ordinal={r.index + 1} />)
             )}
           </ul>
         </div>

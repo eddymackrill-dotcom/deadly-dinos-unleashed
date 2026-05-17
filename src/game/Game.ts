@@ -6,6 +6,7 @@ import { Input } from "./Input";
 import { PostProcess } from "./PostProcess";
 import { createLevel1 } from "../levels/L1_Eoraptor";
 import type { Level } from "../levels/Level";
+import type { CollectedEvent } from "../levels/ScentSequence";
 import { Dinosaur } from "../entities/Dinosaur";
 import { TrackingSystem } from "../systems/TrackingSystem";
 import { ChaseSystem } from "../systems/ChaseSystem";
@@ -14,24 +15,9 @@ import { useGameState } from "../state/gameState";
 import { commitMissionResult, getDinoSave, getMissionSave } from "../progression/Save";
 
 const MISSION_ID = "L1_eoraptor";
-
 const JUMP_BUFFER_MS = 100;
-const NODE_REACH_RADIUS = 3.0;
+const REACH_RADIUS = 1.5;
 const CHASE_FOV = 28;
-
-function activityPoints(tag: "collect" | "chase" | "stealth" | "defense", success: boolean): number {
-  if (!success) return 0;
-  switch (tag) {
-    case "collect":
-      return 100;
-    case "chase":
-      return 250;
-    case "stealth":
-      return 250;
-    case "defense":
-      return 300;
-  }
-}
 
 export class GameFX {
   constructor(private intensityRef: { value: number }) {}
@@ -69,9 +55,6 @@ export class Game {
   private tracking: TrackingSystem;
   private chase: ChaseSystem;
   private inputLocked = false;
-  private chasePendingResult: "win" | "lose" | null = null;
-  private scentLogFrame = 0;
-  private lastLoggedActiveIndex: number | null = null;
   readonly fx: GameFX;
   private rafId: number | null = null;
   private running = false;
@@ -102,7 +85,7 @@ export class Game {
       stats: EORAPTOR.stats,
       rank: 1,
     });
-    state.setScentProgress(0, this.level.getScentTotal());
+    state.setScentProgress(0, this.level.sequence.total);
 
     const dinoSave = getDinoSave(EORAPTOR.id);
     const missionSave = getMissionSave(EORAPTOR.id, MISSION_ID);
@@ -126,9 +109,9 @@ export class Game {
         this.inputLocked = locked;
       },
     });
-    this.chase.onResolved = (result) => {
-      console.log(`[chase] onResolved fired with result=${result}; queued for next frame`);
-      this.chasePendingResult = result;
+    this.chase.onResolved = (outcome) => {
+      const ev = this.level.sequence.resolveEncounter(outcome);
+      if (ev && ev.kind === "collected") this.applyCollected(ev);
     };
 
     void this.player.load({
@@ -147,14 +130,14 @@ export class Game {
 
   private commitMissionToSave() {
     const state = useGameState.getState();
-    const successes = state.activityResults.filter((a) => a.success).length;
-    const total = state.scentTotal;
-    const completion = total === 0 ? 0 : successes / total;
+    const seq = this.level.sequence;
+    const successes = seq.getResults().filter((r) => r.outcome === "win").length;
+    const completion = seq.total === 0 ? 0 : successes / seq.total;
     const result = commitMissionResult({
       dinoId: EORAPTOR.id,
       missionId: MISSION_ID,
       completion,
-      pointsEarned: state.predatorPointsEarned,
+      pointsEarned: seq.totalPointsEarned(),
     });
     state.setPersistedTotals({
       totalPredatorPoints: result.totalPredatorPoints,
@@ -199,9 +182,7 @@ export class Game {
 
     this.player.update(dt);
     this.camera.update(dt);
-
     this.chase.update(dt, this.player.position);
-
     this.level.update({
       dt,
       camera: this.camera.camera,
@@ -210,7 +191,7 @@ export class Game {
 
     const state = useGameState.getState();
     if (state.missionStatus === "playing") {
-      this.handleScentProgress();
+      this.tickSequence();
       this.tracking.tick(dt);
     }
 
@@ -218,77 +199,46 @@ export class Game {
     this.rafId = requestAnimationFrame(this.loop);
   };
 
-  private handleScentProgress() {
-    const active = this.level.getActiveScent();
-    const px = this.player.position.x;
-    const chaseActive = this.chase.isActive;
-    const pending = this.chasePendingResult;
+  /**
+   * The whole scent flow:
+   *   1. Ask sequence if proximity just triggered something this frame.
+   *   2. If 'collected': mirror to store, refill tracking, maybe end mission.
+   *   3. If 'encounterStarted': kick off the visual encounter (chase, etc.).
+   *      The encounter's onResolved callback will land back here via
+   *      sequence.resolveEncounter -> applyCollected.
+   *
+   * Notice: there's only one place where state changes — applyCollected. The
+   * sequence is the source of truth; the store is a projection.
+   */
+  private tickSequence() {
+    const ev = this.level.sequence.tick(this.player.position, REACH_RADIUS);
+    if (!ev) return;
 
-    // Log once every 30 frames (~0.5s), and immediately when the active node changes.
-    this.scentLogFrame++;
-    const activeIdx = active?.index ?? null;
-    const indexChanged = activeIdx !== this.lastLoggedActiveIndex;
-    if (indexChanged || this.scentLogFrame % 30 === 0) {
-      const dx = active ? active.position.x - px : Infinity;
-      console.log(
-        `[scent.tick] player.x=${px.toFixed(2)} active=${
-          active ? `#${active.index}(${active.tag})@x=${active.position.x}` : "none"
-        } dx=${Number.isFinite(dx) ? dx.toFixed(2) : "n/a"} chase.isActive=${chaseActive} pending=${pending}`,
-      );
-      this.lastLoggedActiveIndex = activeIdx;
-    }
-
-    if (chaseActive) return;
-
-    if (pending !== null) {
-      console.log(`[scent] draining chasePendingResult=${pending} -> completeActivity`);
-      this.chasePendingResult = null;
-      this.completeActivity(pending === "win");
-      return;
-    }
-
-    if (!active) return;
-
-    const dx = active.position.x - px;
-    if (Math.abs(dx) > NODE_REACH_RADIUS) return;
-
-    if (active.tag === "chase") {
-      const facing: 1 | -1 = this.player.velocityX >= 0 ? 1 : -1;
-      console.log(`[scent] within reach of chase node #${active.index}; calling chase.start(${active.position.x}, ${facing})`);
-      this.chase.start(active.position.x, facing);
-    } else {
-      console.log(`[scent] within reach of collect node #${active.index}; calling completeActivity(true)`);
-      this.completeActivity(true);
+    if (ev.kind === "collected") {
+      this.applyCollected(ev);
+    } else if (ev.kind === "encounterStarted") {
+      if (ev.nodeType === "chase") {
+        const facing: 1 | -1 = this.player.velocityX >= 0 ? 1 : -1;
+        this.chase.start(ev.position.x, facing);
+      }
     }
   }
 
-  private completeActivity(success: boolean) {
-    const active = this.level.getActiveScent();
+  private applyCollected(ev: CollectedEvent) {
+    const seq = this.level.sequence;
     const state = useGameState.getState();
-    if (active) {
-      state.recordActivity({
-        index: active.index,
-        tag: active.tag,
-        success,
-        points: activityPoints(active.tag, success),
-      });
-    }
 
-    this.level.collectActive();
-    const collected = this.level.getScentCollected();
-    const total = this.level.getScentTotal();
-    state.setScentProgress(collected, total);
+    state.setScentResults(seq.getResults());
+    state.setScentProgress(seq.collectedCount, seq.total);
 
     console.log(
-      `[scent] node ${active?.index ?? "?"} (${active?.tag ?? "?"}) ${
-        success ? "completed" : "failed"
-      } -> collected ${collected}/${total}, new active index ${collected}`,
+      `[scent] node #${ev.nodeIndex} (${ev.nodeType}) collected outcome=${ev.outcome} +${ev.points} -> ${seq.collectedCount}/${seq.total}`,
     );
 
-    if (collected >= total) {
+    if (seq.isComplete) {
       state.setStatus("complete");
       this.commitMissionToSave();
-    } else if (success) {
+    } else if (ev.outcome === "win") {
       this.tracking.refill();
     }
   }

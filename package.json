@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:scent": "tsx scripts/run-selftest.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.14.0",

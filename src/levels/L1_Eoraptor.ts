@@ -1,13 +1,14 @@
 import * as THREE from "three";
-import type { ActiveScentInfo, Level, ScentNodeTag } from "./Level";
+import type { Level } from "./Level";
 import { ParallaxBackground } from "./ParallaxBackground";
+import { ScentSequence, type ScentNodeConfig } from "./ScentSequence";
 import { ScentNode } from "../entities/ScentNode";
 import { Chevron } from "../entities/Chevron";
 
-const NODE_SEQUENCE: Array<{ x: number; tag: ScentNodeTag }> = [
-  { x: 12, tag: "collect" },
-  { x: 28, tag: "chase" },
-  { x: 46, tag: "collect" },
+const NODE_CONFIGS: ScentNodeConfig[] = [
+  { position: new THREE.Vector3(12, 0.4, 0), type: "collect", points: 100 },
+  { position: new THREE.Vector3(28, 0.4, 0), type: "chase", points: 250 },
+  { position: new THREE.Vector3(46, 0.4, 0), type: "collect", points: 100 },
 ];
 
 function mulberry32(a: number) {
@@ -169,76 +170,48 @@ export function createLevel1(): Level {
   ]);
   root.add(parallax.root);
 
-  const nodes: ScentNode[] = NODE_SEQUENCE.map((cfg) => {
-    const node = new ScentNode({
-      position: new THREE.Vector3(cfg.x, 0.4, 0),
-      tag: cfg.tag,
-    });
-    root.add(node.particles.root);
-    return node;
+  const sequence = new ScentSequence(NODE_CONFIGS);
+  const nodes: ScentNode[] = NODE_CONFIGS.map((cfg) => {
+    const n = new ScentNode(cfg.position);
+    root.add(n.particles.root);
+    return n;
   });
-  let activeIndex = 0;
-  if (nodes.length > 0) nodes[0].setActive(true);
-
-  console.log(
-    `[level] L1 nodes:`,
-    nodes.map((n, i) => `#${i} (${n.tag}) @ x=${n.position.x}`).join(", "),
-  );
 
   const chevron = new Chevron();
   root.add(chevron.root);
   let chevronOverrideX: number | null = null;
 
-  function syncActive() {
-    nodes.forEach((n, i) => n.setActive(i === activeIndex));
+  function refreshNodeVisuals() {
+    const activeIdx = sequence.getActiveIndex();
+    for (let i = 0; i < nodes.length; i++) {
+      nodes[i].setVisible(i === activeIdx);
+    }
   }
-
-  function getActive(): ActiveScentInfo | null {
-    if (activeIndex >= nodes.length) return null;
-    const n = nodes[activeIndex];
-    return { index: activeIndex, position: n.position, tag: n.tag };
-  }
+  refreshNodeVisuals();
 
   return {
     root,
+    sequence,
     update({ dt, camera, playerPosition }) {
       parallax.update(camera.position.x);
+
+      // Refresh which node emits particles based on current active index. Cheap;
+      // no state of its own — the visuals follow the canonical sequence state.
+      refreshNodeVisuals();
+
       for (const n of nodes) n.update(dt, camera.quaternion);
 
-      if (chevronOverrideX !== null) {
-        chevron.setTargetX(chevronOverrideX);
+      const targetX =
+        chevronOverrideX !== null
+          ? chevronOverrideX
+          : sequence.getActive()?.position.x ?? null;
+      chevron.setTargetX(targetX);
+      if (targetX !== null) {
         chevron.update(playerPosition.x, playerPosition.y, camera, dt);
-      } else if (activeIndex < nodes.length) {
-        chevron.setTargetX(nodes[activeIndex].position.x);
-        chevron.update(playerPosition.x, playerPosition.y, camera, dt);
-      } else {
-        chevron.setTargetX(null);
       }
-    },
-    getActiveScent() {
-      return getActive();
-    },
-    collectActive() {
-      if (activeIndex >= nodes.length) return;
-      const prevIndex = activeIndex;
-      nodes[activeIndex].collect();
-      activeIndex++;
-      syncActive();
-      console.log(
-        `[level] collectActive: ${prevIndex} -> ${activeIndex}` +
-          (activeIndex < nodes.length
-            ? ` (next active: node #${activeIndex} ${nodes[activeIndex].tag} @ x=${nodes[activeIndex].position.x})`
-            : ` (sequence done)`),
-      );
     },
     setChevronTargetOverride(x) {
       chevronOverrideX = x;
-    },
-    getScentTotal() {
-      return nodes.length;
-    },
-    getScentCollected() {
-      return activeIndex;
     },
     dispose() {
       for (const n of nodes) n.dispose();
