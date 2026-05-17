@@ -16,6 +16,14 @@ function TrackingBar() {
   const scentTotal = useGameState((s) => s.scentTotal);
   const status = useGameState((s) => s.missionStatus);
 
+  const prevScentRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (prevScentRef.current !== scentCollected) {
+      console.log(`[hud] TrackingBar read scentCollected=${scentCollected} / ${scentTotal}`);
+      prevScentRef.current = scentCollected;
+    }
+  }, [scentCollected, scentTotal]);
+
   const pct = Math.max(0, Math.min(1, trackingPercent));
   const danger = pct < 0.25;
   const barColor =

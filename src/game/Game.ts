@@ -218,7 +218,6 @@ export class Game {
   private handleScentProgress() {
     if (this.chase.isActive) return;
 
-    // Drain any pending chase resolution first (collects the node + handles refill rules).
     if (this.chasePendingResult !== null) {
       const result = this.chasePendingResult;
       this.chasePendingResult = null;
@@ -256,6 +255,13 @@ export class Game {
     const collected = this.level.getScentCollected();
     const total = this.level.getScentTotal();
     state.setScentProgress(collected, total);
+
+    console.log(
+      `[scent] node ${active?.index ?? "?"} (${active?.tag ?? "?"}) ${
+        success ? "completed" : "failed"
+      } -> collected ${collected}/${total}, new active index ${collected}`,
+    );
+
     if (collected >= total) {
       state.setStatus("complete");
       this.commitMissionToSave();

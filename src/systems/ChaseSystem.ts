@@ -26,18 +26,23 @@ export interface ChaseCallbacks {
 
 export class ChaseSystem {
   private active = false;
+  // Resolving covers the 0.9s still-frame window between catch and final cleanup.
+  // While resolving, isActive stays true so the proximity check in handleScentProgress
+  // does not re-trigger chase.start() and wedge the sequence forever.
+  private resolving = false;
   private prey: PreyAnimal | null = null;
   private timer = 0;
 
   constructor(private cb: ChaseCallbacks) {}
 
   get isActive() {
-    return this.active;
+    return this.active || this.resolving;
   }
 
   start(scentNodeX: number, playerFacing: 1 | -1) {
-    if (this.active) return;
+    if (this.active || this.resolving) return;
     this.active = true;
+    this.resolving = false;
     this.timer = CHASE_DURATION_SECONDS;
 
     this.prey = new PreyAnimal();
@@ -53,7 +58,7 @@ export class ChaseSystem {
   }
 
   update(dt: number, playerPosition: THREE.Vector3) {
-    if (!this.active || !this.prey) return;
+    if (!this.active || this.resolving || !this.prey) return;
 
     this.prey.update(dt);
     this.cb.setChevronOverride(this.prey.position.x);
@@ -73,10 +78,18 @@ export class ChaseSystem {
   }
 
   private resolve(result: "win" | "lose") {
-    if (!this.active || !this.prey) return;
-    this.active = false;
+    if (!this.active || this.resolving || !this.prey) return;
+    this.resolving = true;
     const flashUntil = performance.now() + FLASH_DURATION_MS;
     useGameState.getState().endChase(result, flashUntil);
+
+    const finalize = () => {
+      this.cleanup();
+      this.cb.onFOVReset();
+      this.active = false;
+      this.resolving = false;
+      this.onResolved?.(result);
+    };
 
     if (result === "win") {
       this.cb.onCameraShake(0.18, 0.1);
@@ -84,17 +97,10 @@ export class ChaseSystem {
       this.cb.setPlayerInputLocked(true);
       gsap.delayedCall(FLASH_DURATION_MS / 1000, () => {
         this.cb.setPlayerInputLocked(false);
-        this.cleanup();
-        this.cb.onFOVReset();
-        this.onResolved?.(result);
+        finalize();
       });
     } else {
-      // Prey escapes off-screen — let it run a bit before cleanup.
-      gsap.delayedCall(0.8, () => {
-        this.cleanup();
-        this.cb.onFOVReset();
-        this.onResolved?.(result);
-      });
+      gsap.delayedCall(0.8, finalize);
     }
   }
 
