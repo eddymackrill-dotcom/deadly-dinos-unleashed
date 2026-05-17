@@ -285,16 +285,16 @@ gets thrown away. Final art replacement is its own milestone.
 
 ---
 
-## Open Questions for the Builder
+## Confirmed Decisions
 
-These should be confirmed before M2:
+Confirmed before M2 (2026-05-17):
 
-1. **Educational layer:** BBC's game has a real conservation message tied to living animals. Dinosaurs are extinct — should the "Fossil Discovery Programme" focus on (a) real palaeontology education, (b) modern conservation lessons drawn from extinction parallels, or (c) drop the educational layer entirely and lean into action?
-2. **Target audience:** Same as BBC (CBBC, ~7–11)? Affects violence depiction (the BBC original is bloodless — predators "catch" prey via tackle animation, no kill shown).
-3. **Platform:** Web only, or also package as desktop (Electron / Tauri)?
-4. **Save system:** LocalStorage (single device) or accounts?
-5. **Eoraptor substitute:** if Quaternius pack doesn't include Eoraptor specifically, is it OK to use a similar small theropod renamed in code, or should we source a dedicated Eoraptor GLB from Sketchfab (CC-BY, requires attribution in credits)?
-6. **Post-process performance budget:** chromatic aberration is cheap; bloom and grain are not. Target hardware floor — Chromebook-tier integrated GPU, or assume a dedicated GPU? Affects which passes ship enabled by default.
+1. **Educational layer:** Real palaeontology — the **Fossil Discovery Programme** replaces the conservation system as already specced. Fact cards cover anatomy, fossil sites, contemporaries. No modern-conservation framing.
+2. **Target audience:** Same as BBC (CBBC, ~7–11). Bloodless catches — tackle animation only, no kill shown. Mechanics, palette, and copy should respect this floor.
+3. **Platform:** Web only for v1. Desktop packaging (Electron / Tauri) is deferred until after v1 ships. No platform-specific code paths in v1.
+4. **Save system:** LocalStorage. Per-dino mission progress (completion %, hidden secrets found), predator points, unlocked styles, fossil programme %. No accounts, no cloud sync in v1.
+5. **Eoraptor substitute:** Velociraptor placeholder (already in `public/models/eoraptor.glb`) is confirmed for now. Full-roster sourcing decision (Quaternius vs. Sketchfab CC-BY vs. mixed) is deferred until after M2.
+6. **Post-process performance budget:** Chromebook-tier integrated GPU is the floor. Default-on post-process passes are limited to chromatic aberration. Bloom and film grain ship **disabled by default**, toggleable in accessibility settings.
 
 ---
 
