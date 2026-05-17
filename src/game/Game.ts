@@ -7,6 +7,9 @@ import { PostProcess } from "./PostProcess";
 import { createLevel1 } from "../levels/L1_Eoraptor";
 import type { Level } from "../levels/Level";
 import { Dinosaur } from "../entities/Dinosaur";
+import { TrackingSystem } from "../systems/TrackingSystem";
+import { EORAPTOR, trackingDuration } from "../data/dinosaurs";
+import { useGameState } from "../state/gameState";
 
 const JUMP_BUFFER_MS = 100;
 
@@ -33,6 +36,8 @@ export class Game {
   private player: Dinosaur;
   private input: Input;
   private postProcess: PostProcess;
+  private tracking: TrackingSystem;
+  private lastScentCollected = 0;
   readonly fx: GameFX;
   private rafId: number | null = null;
   private running = false;
@@ -53,12 +58,30 @@ export class Game {
     this.postProcess = new PostProcess(this.scene.renderer, this.scene.scene, this.camera.camera);
     this.fx = new GameFX(this.postProcess.glitchIntensity);
 
+    const state = useGameState.getState();
+    state.reset();
+    state.setDino({
+      id: EORAPTOR.id,
+      name: EORAPTOR.name,
+      era: EORAPTOR.era,
+      region: EORAPTOR.region,
+    });
+    state.setScentProgress(0, this.level.getScentTotal());
+
+    const duration = trackingDuration(EORAPTOR.stats, EORAPTOR.baseTrackingDuration);
+    this.tracking = new TrackingSystem(duration, () => this.onMissionFail());
+
     void this.player.load({
       url: "/models/eoraptor.glb",
       targetHeight: 0.8,
       idleNameHint: "idle",
       runNameHint: "run",
     });
+  }
+
+  private onMissionFail() {
+    useGameState.getState().setStatus("failed");
+    this.fx.titleSting();
   }
 
   start() {
@@ -96,6 +119,23 @@ export class Game {
       camera: this.camera.camera,
       playerPosition: this.player.position,
     });
+
+    const state = useGameState.getState();
+    if (state.missionStatus === "playing") {
+      const collected = this.level.getScentCollected();
+      const total = this.level.getScentTotal();
+      if (collected !== this.lastScentCollected) {
+        this.lastScentCollected = collected;
+        state.setScentProgress(collected, total);
+        if (collected >= total) {
+          state.setStatus("complete");
+        } else {
+          this.tracking.refill();
+        }
+      }
+      this.tracking.tick(dt);
+    }
+
     this.postProcess.render();
     this.rafId = requestAnimationFrame(this.loop);
   };

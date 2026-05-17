@@ -73,9 +73,35 @@ up better with the desired effect.
   in both directions, clamps to the screen edge when far away, and stops
   rendering after the last node is collected.
 
-## Chunk 3 — Tracking bar HUD
+## Chunk 3 — Tracking bar HUD ✅
 
-Pending.
+- `src/data/dinosaurs.ts` — `DinoStats`, `DinoData`, `EORAPTOR`, and a
+  `trackingDuration(stats, base, moreTimeCard?)` helper implementing
+  DESIGN.md §2: `base * (1 + senses * 0.05) * (1.5 if MoreTime else 1)`.
+  Eoraptor: senses 5, base 25s → tracking duration **31.25s**.
+- `src/state/gameState.ts` — Zustand store for HUD state:
+  `trackingPercent`, `scentCollected`, `scentTotal`, `missionStatus`,
+  dino metadata, and reset.
+- `src/systems/TrackingSystem.ts` — drains the bar at `1 / duration` per
+  second, refills on `refill()`, fires `onFail` once at 0.
+- `Game` constructs the tracking system with the Eoraptor duration on
+  boot, refills it whenever `getScentCollected()` advances, and flips
+  `missionStatus` to `complete` when all nodes are in. On fail, fires the
+  chromatic-aberration sting and shows the **MISSION FAILED** card.
+- HUD (`App.tsx`):
+  - Tracking bar across the top with magenta gradient, switches to
+    rose-pulse below 25%, switches to green on complete.
+  - `SCENT n / total` counter underneath.
+  - Centered `MISSION FAILED` / `MISSION COMPLETE` cards driven by store
+    status.
+
+### Self-test
+
+- `npx tsc -b` — clean.
+- `npx vite build` — clean.
+- **MANUAL:** verify bar drains visibly, refills on reaching each scent
+  node, turns rose-pulse below 25%, and triggers the fail card if the
+  player stands still for ~31s.
 
 ## Chunk 4 — Chase mechanic
 
