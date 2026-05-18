@@ -2,14 +2,16 @@ import * as THREE from "three";
 import { PreyAnimal } from "../entities/PreyAnimal";
 import { useGameState } from "../state/gameState";
 
-// Catch math (player at full sprint should beat the timer with ~1.5s margin):
-//   time_to_close = head_start / (PLAYER_MAX_SPEED * (1 - PREY_SPEED_RATIO))
-//   = 4 / (5 * 0.18) = 4.44s. Timer 7s -> conservative margin 2.56s.
-//   With catch radius: (4 - 1.2) / 0.9 = 3.11s -> real margin 3.89s.
+// Catch math (player at full sprint should beat the timer with comfortable margin):
+//   time_to_close = (head_start - catch_radius) / (PLAYER_MAX_SPEED * (1 - PREY_SPEED_RATIO))
+//   = (4 - 1.8) / (5 * 0.18) = 2.44s. Timer 7s -> margin 4.56s.
+// Catch radius bumped from 1.2 -> 1.8 because Parasaurolophus is ~3u long at
+// target height 1u; the smaller radius let the player visually overlap the
+// prey's tail before the catch fired.
 const CHASE_DURATION_SECONDS = 7;
 const PREY_SPAWN_AHEAD_X = 4;
 const PREY_SPEED_RATIO = 0.82;
-const CATCH_RADIUS = 1.2;
+const CATCH_RADIUS = 1.8;
 const PLAYER_MAX_SPEED = 5.0;
 const FLASH_DURATION_MS = 900;
 const LOSE_TAIL_SECONDS = 0.8;

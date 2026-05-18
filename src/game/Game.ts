@@ -8,6 +8,7 @@ import { createLevel1 } from "../levels/L1_Eoraptor";
 import type { Level } from "../levels/Level";
 import type { CollectedEvent } from "../levels/ScentSequence";
 import { Dinosaur } from "../entities/Dinosaur";
+import { PreyAnimal } from "../entities/PreyAnimal";
 import { TrackingSystem } from "../systems/TrackingSystem";
 import { ChaseSystem } from "../systems/ChaseSystem";
 import { EORAPTOR, trackingDuration } from "../data/dinosaurs";
@@ -120,6 +121,9 @@ export class Game {
       idleNameHint: "idle",
       runNameHint: "run",
     });
+
+    // Warm the GLB cache so the first chase doesn't pop in.
+    PreyAnimal.preload();
   }
 
   private onMissionFail() {
