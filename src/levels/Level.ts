@@ -1,5 +1,6 @@
 import type * as THREE from "three";
 import type { ScentSequence } from "./ScentSequence";
+import type { SecretConfig } from "../systems/HiddenSecretsSystem";
 
 export interface LevelUpdateContext {
   dt: number;
@@ -11,6 +12,8 @@ export interface Level {
   readonly root: THREE.Object3D;
   /** Single source of truth for scent progress. */
   readonly sequence: ScentSequence;
+  /** Hidden secret positions/ids for this level. */
+  readonly secrets: SecretConfig[];
   update(ctx: LevelUpdateContext): void;
   /**
    * Override the chevron's target X (e.g. point at chase prey instead of the

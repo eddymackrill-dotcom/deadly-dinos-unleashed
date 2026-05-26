@@ -240,13 +240,69 @@ function ChaseResultFlash() {
   );
 }
 
+function HiddenSecretsCounter() {
+  const claimed = useGameState((s) => s.hiddenSecretsClaimed);
+  const total = useGameState((s) => s.hiddenSecretsTotal);
+  if (total === 0) return null;
+  return (
+    <div className="absolute top-4 right-4 pointer-events-none select-none">
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/45 border border-white/15">
+        <span className="text-base" aria-hidden>
+          ✦
+        </span>
+        <span className="font-display text-amber-100 text-sm tracking-widest">
+          {claimed}/{total} HIDDEN
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function RewardPopup() {
+  const popup = useGameState((s) => s.rewardPopup);
+  const [now, setNow] = useState(() => performance.now());
+
+  useEffect(() => {
+    if (!popup) return;
+    let raf = 0;
+    const tick = () => {
+      setNow(performance.now());
+      if (performance.now() - popup.spawnedAt < 1800) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [popup]);
+
+  if (!popup) return null;
+  const age = now - popup.spawnedAt;
+  if (age > 1800) return null;
+  const t = Math.min(1, age / 1800);
+  const yOffset = -t * 40;
+  const opacity = t < 0.85 ? 1 : 1 - (t - 0.85) / 0.15;
+
+  return (
+    <div
+      key={popup.id}
+      className="absolute inset-x-0 top-1/3 flex justify-center pointer-events-none select-none"
+      style={{ transform: `translateY(${yOffset}px)`, opacity }}
+    >
+      <div className="font-display tracking-widest text-amber-200 text-3xl drop-shadow-lg"
+           style={{ textShadow: "0 0 12px rgba(255,209,102,0.6)" }}>
+        {popup.text}
+      </div>
+    </div>
+  );
+}
+
 function HUD() {
   return (
     <>
       <TrackingBar />
+      <HiddenSecretsCounter />
       <ChaseTimerBar />
       <StealthBar />
       <DefenseOverlay />
+      <RewardPopup />
       <ChaseResultFlash />
     </>
   );

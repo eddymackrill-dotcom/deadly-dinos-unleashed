@@ -6,6 +6,10 @@ export interface MissionSave {
   bestPoints: number;
   attempts: number;
   hiddenSecretsFound: number;
+  /** Stable IDs of hidden secrets the player has discovered. Used to prevent
+   *  respawn on replay. The count is also reflected in hiddenSecretsFound for
+   *  back-compat with old reads. */
+  foundSecretIds: string[];
 }
 
 export interface DinoSave {
@@ -28,7 +32,24 @@ function emptyDinoSave(): DinoSave {
 }
 
 function emptyMissionSave(): MissionSave {
-  return { completion: 0, bestPoints: 0, attempts: 0, hiddenSecretsFound: 0 };
+  return {
+    completion: 0,
+    bestPoints: 0,
+    attempts: 0,
+    hiddenSecretsFound: 0,
+    foundSecretIds: [],
+  };
+}
+
+function normalizeMissionSave(raw: Partial<MissionSave> | undefined): MissionSave {
+  if (!raw) return emptyMissionSave();
+  return {
+    completion: raw.completion ?? 0,
+    bestPoints: raw.bestPoints ?? 0,
+    attempts: raw.attempts ?? 0,
+    hiddenSecretsFound: raw.hiddenSecretsFound ?? 0,
+    foundSecretIds: Array.isArray(raw.foundSecretIds) ? [...raw.foundSecretIds] : [],
+  };
 }
 
 function readRaw(): SaveData {
@@ -66,7 +87,7 @@ export function getDinoSave(dinoId: string): DinoSave {
 
 export function getMissionSave(dinoId: string, missionId: string): MissionSave {
   const dino = getDinoSave(dinoId);
-  return dino.missions[missionId] ?? emptyMissionSave();
+  return normalizeMissionSave(dino.missions[missionId]);
 }
 
 export interface MissionResultInput {
@@ -75,6 +96,8 @@ export interface MissionResultInput {
   completion: number; // 0..1
   pointsEarned: number;
   hiddenSecretsFound?: number;
+  /** Secret IDs discovered during this attempt. Merged into the persisted set. */
+  foundSecretIds?: string[];
 }
 
 export interface SaveCommitResult {
@@ -89,10 +112,13 @@ export interface SaveCommitResult {
 export function commitMissionResult(input: MissionResultInput): SaveCommitResult {
   const save = readRaw();
   const dino = save.dinos[input.dinoId] ?? emptyDinoSave();
-  const mission = dino.missions[input.missionId] ?? emptyMissionSave();
+  const mission = normalizeMissionSave(dino.missions[input.missionId]);
 
   const isNewBestCompletion = input.completion > mission.completion;
   const isNewBestPoints = input.pointsEarned > mission.bestPoints;
+
+  const mergedSecrets = new Set(mission.foundSecretIds);
+  for (const id of input.foundSecretIds ?? []) mergedSecrets.add(id);
 
   const updatedMission: MissionSave = {
     completion: Math.max(mission.completion, input.completion),
@@ -100,8 +126,9 @@ export function commitMissionResult(input: MissionResultInput): SaveCommitResult
     attempts: mission.attempts + 1,
     hiddenSecretsFound: Math.max(
       mission.hiddenSecretsFound,
-      input.hiddenSecretsFound ?? 0,
+      input.hiddenSecretsFound ?? mergedSecrets.size,
     ),
+    foundSecretIds: Array.from(mergedSecrets),
   };
 
   const updatedDino: DinoSave = {

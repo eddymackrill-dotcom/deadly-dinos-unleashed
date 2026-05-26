@@ -13,6 +13,7 @@ import { TrackingSystem } from "../systems/TrackingSystem";
 import { ChaseSystem } from "../systems/ChaseSystem";
 import { StealthSystem } from "../systems/StealthSystem";
 import { DefenseSystem } from "../systems/DefenseSystem";
+import { HiddenSecretsSystem } from "../systems/HiddenSecretsSystem";
 import { EORAPTOR, trackingDuration } from "../data/dinosaurs";
 import { useGameState } from "../state/gameState";
 import { commitMissionResult, getDinoSave, getMissionSave } from "../progression/Save";
@@ -59,6 +60,7 @@ export class Game {
   private chase: ChaseSystem;
   private stealth: StealthSystem;
   private defense: DefenseSystem;
+  private secrets: HiddenSecretsSystem;
   private inputLocked = false;
   readonly fx: GameFX;
   private rafId: number | null = null;
@@ -148,6 +150,12 @@ export class Game {
       onGlitchSting: () => this.fx.catchSting(),
       toughnessStat: EORAPTOR.stats.toughness,
     });
+    this.secrets = new HiddenSecretsSystem(
+      { scene: this.scene.scene },
+      this.level.secrets,
+      missionSave.foundSecretIds ?? [],
+    );
+
     this.defense.onResolved = (outcome) => {
       const basePoints = this.level.sequence.getActivePoints();
       const ratio = this.defense.partialPointsRatio();
@@ -181,11 +189,14 @@ export class Game {
     const seq = this.level.sequence;
     const successes = seq.getResults().filter((r) => r.outcome === "win").length;
     const completion = seq.total === 0 ? 0 : successes / seq.total;
+    const secretIds = this.secrets.getClaimedIds();
     const result = commitMissionResult({
       dinoId: EORAPTOR.id,
       missionId: MISSION_ID,
       completion,
-      pointsEarned: seq.totalPointsEarned(),
+      pointsEarned: seq.totalPointsEarned() + state.secretBonusPoints,
+      foundSecretIds: secretIds,
+      hiddenSecretsFound: this.secrets.claimedCount,
     });
     state.setPersistedTotals({
       totalPredatorPoints: result.totalPredatorPoints,
@@ -233,6 +244,7 @@ export class Game {
     this.chase.update(dt, this.player.position);
     this.stealth.update(dt, this.player.position);
     this.defense.update(dt);
+    this.secrets.update(dt, this.player.position);
     this.level.update({
       dt,
       camera: this.camera.camera,
@@ -300,6 +312,7 @@ export class Game {
   dispose() {
     this.stop();
     this.input.dispose();
+    this.secrets.dispose();
     this.level.dispose();
     this.postProcess.dispose();
     this.scene.dispose();

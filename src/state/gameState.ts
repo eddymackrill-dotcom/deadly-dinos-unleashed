@@ -64,6 +64,11 @@ export interface MissionState {
   defenseHits: number;
   defenseMisses: number;
 
+  hiddenSecretsClaimed: number;
+  hiddenSecretsTotal: number;
+  secretBonusPoints: number;
+  rewardPopup: { id: number; text: string; spawnedAt: number } | null;
+
   setTrackingPercent: (v: number) => void;
   setScentProgress: (collected: number, total: number) => void;
   setStatus: (s: MissionStatus) => void;
@@ -89,6 +94,9 @@ export interface MissionState {
     misses: number,
     flashUntil: number,
   ) => void;
+  setHiddenSecretsProgress: (claimed: number, total: number) => void;
+  addSecretPoints: (points: number) => void;
+  pushRewardPopup: (text: string) => void;
   /** Replace the entire results array from the sequence. */
   setScentResults: (results: NodeResult[]) => void;
   setPersistedTotals: (info: {
@@ -101,6 +109,8 @@ export interface MissionState {
 }
 
 const initialDinoStats: DinoStatsView = { speed: 0, toughness: 0, power: 0, senses: 0 };
+
+let rewardPopupCounter = 1;
 
 const initial: Omit<
   MissionState,
@@ -117,6 +127,9 @@ const initial: Omit<
   | "startDefense"
   | "setDefensePrompt"
   | "endDefense"
+  | "setHiddenSecretsProgress"
+  | "addSecretPoints"
+  | "pushRewardPopup"
   | "setScentResults"
   | "setPersistedTotals"
   | "setNewBests"
@@ -153,6 +166,11 @@ const initial: Omit<
   defensePrompt: null,
   defenseHits: 0,
   defenseMisses: 0,
+
+  hiddenSecretsClaimed: 0,
+  hiddenSecretsTotal: 0,
+  secretBonusPoints: 0,
+  rewardPopup: null,
 };
 
 export const useGameState = create<MissionState>((set) => ({
@@ -203,6 +221,12 @@ export const useGameState = create<MissionState>((set) => ({
       chaseResult: result,
       chaseResultFlashUntil: flashUntil,
     }),
+  setHiddenSecretsProgress: (claimed, total) =>
+    set({ hiddenSecretsClaimed: claimed, hiddenSecretsTotal: total }),
+  addSecretPoints: (points) =>
+    set((s) => ({ secretBonusPoints: s.secretBonusPoints + points })),
+  pushRewardPopup: (text) =>
+    set({ rewardPopup: { id: rewardPopupCounter++, text, spawnedAt: performance.now() } }),
   setScentResults: (results) => {
     const points = results.reduce((s, r) => s + r.points, 0);
     set({ scentResults: results.map((r) => ({ ...r })), predatorPointsEarned: points });
