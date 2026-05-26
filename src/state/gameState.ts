@@ -69,6 +69,11 @@ export interface MissionState {
   secretBonusPoints: number;
   rewardPopup: { id: number; text: string; spawnedAt: number } | null;
 
+  powerReady: boolean;
+  powerActive: boolean;
+  powerCooldownPercent: number; // 1.0 = just fired, 0 = ready
+  powerBurstUntil: number;
+
   setTrackingPercent: (v: number) => void;
   setScentProgress: (collected: number, total: number) => void;
   setStatus: (s: MissionStatus) => void;
@@ -97,6 +102,12 @@ export interface MissionState {
   setHiddenSecretsProgress: (claimed: number, total: number) => void;
   addSecretPoints: (points: number) => void;
   pushRewardPopup: (text: string) => void;
+  setPowerState: (info: {
+    ready: boolean;
+    active: boolean;
+    cooldownPercent: number;
+    burstUntil?: number;
+  }) => void;
   /** Replace the entire results array from the sequence. */
   setScentResults: (results: NodeResult[]) => void;
   setPersistedTotals: (info: {
@@ -130,6 +141,7 @@ const initial: Omit<
   | "setHiddenSecretsProgress"
   | "addSecretPoints"
   | "pushRewardPopup"
+  | "setPowerState"
   | "setScentResults"
   | "setPersistedTotals"
   | "setNewBests"
@@ -171,6 +183,11 @@ const initial: Omit<
   hiddenSecretsTotal: 0,
   secretBonusPoints: 0,
   rewardPopup: null,
+
+  powerReady: true,
+  powerActive: false,
+  powerCooldownPercent: 0,
+  powerBurstUntil: 0,
 };
 
 export const useGameState = create<MissionState>((set) => ({
@@ -227,6 +244,13 @@ export const useGameState = create<MissionState>((set) => ({
     set((s) => ({ secretBonusPoints: s.secretBonusPoints + points })),
   pushRewardPopup: (text) =>
     set({ rewardPopup: { id: rewardPopupCounter++, text, spawnedAt: performance.now() } }),
+  setPowerState: (info) =>
+    set((s) => ({
+      powerReady: info.ready,
+      powerActive: info.active,
+      powerCooldownPercent: Math.max(0, Math.min(1, info.cooldownPercent)),
+      powerBurstUntil: info.burstUntil ?? s.powerBurstUntil,
+    })),
   setScentResults: (results) => {
     const points = results.reduce((s, r) => s + r.points, 0);
     set({ scentResults: results.map((r) => ({ ...r })), predatorPointsEarned: points });

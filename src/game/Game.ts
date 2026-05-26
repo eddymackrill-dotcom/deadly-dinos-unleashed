@@ -14,6 +14,7 @@ import { ChaseSystem } from "../systems/ChaseSystem";
 import { StealthSystem } from "../systems/StealthSystem";
 import { DefenseSystem } from "../systems/DefenseSystem";
 import { HiddenSecretsSystem } from "../systems/HiddenSecretsSystem";
+import { PowerSystem } from "../systems/PowerSystem";
 import { EORAPTOR, trackingDuration } from "../data/dinosaurs";
 import { useGameState } from "../state/gameState";
 import { commitMissionResult, getDinoSave, getMissionSave } from "../progression/Save";
@@ -46,6 +47,15 @@ export class GameFX {
       .to(this.intensityRef, { value: 0.004, duration: 0.15, ease: "power2.in" })
       .to(this.intensityRef, { value: 0, duration: 0.5, ease: "power2.in" });
   }
+
+  dashBurst() {
+    gsap.killTweensOf(this.intensityRef);
+    gsap
+      .timeline()
+      .set(this.intensityRef, { value: 0 })
+      .to(this.intensityRef, { value: 0.012, duration: 0.05, ease: "power2.out" })
+      .to(this.intensityRef, { value: 0, duration: 0.15, ease: "power2.in" });
+  }
 }
 
 export class Game {
@@ -61,6 +71,9 @@ export class Game {
   private stealth: StealthSystem;
   private defense: DefenseSystem;
   private secrets: HiddenSecretsSystem;
+  private power: PowerSystem;
+  private stealthSpeedMult = 1;
+  private dashSpeedMult = 1;
   private inputLocked = false;
   readonly fx: GameFX;
   private rafId: number | null = null;
@@ -129,7 +142,10 @@ export class Game {
       setPlayerInputLocked: (locked) => {
         this.inputLocked = locked;
       },
-      setPlayerSpeedMult: (m) => this.player.setSpeedMultiplier(m),
+      setPlayerSpeedMult: (m) => {
+        this.stealthSpeedMult = m;
+        this.applySpeedMultiplier();
+      },
       setPlayerTint: (color, mix, opacity) => this.player.setTint(color, mix, opacity),
       sensesStat: EORAPTOR.stats.senses,
     });
@@ -155,6 +171,15 @@ export class Game {
       this.level.secrets,
       missionSave.foundSecretIds ?? [],
     );
+
+    this.power = new PowerSystem({
+      setDashSpeedMult: (m) => {
+        this.dashSpeedMult = m;
+        this.applySpeedMultiplier();
+      },
+      onActivate: () => this.fx.dashBurst(),
+      powerStat: EORAPTOR.stats.power,
+    });
 
     this.defense.onResolved = (outcome) => {
       const basePoints = this.level.sequence.getActivePoints();
@@ -182,6 +207,10 @@ export class Game {
     useGameState.getState().setStatus("failed");
     this.fx.titleSting();
     this.commitMissionToSave();
+  }
+
+  private applySpeedMultiplier() {
+    this.player.setSpeedMultiplier(this.stealthSpeedMult * this.dashSpeedMult);
   }
 
   private commitMissionToSave() {
@@ -237,8 +266,15 @@ export class Game {
           this.input.consumeJumpPress();
         }
       }
+      const powerAgeMs = performance.now() - this.input.powerPressedAt();
+      if (powerAgeMs <= JUMP_BUFFER_MS) {
+        if (this.power.tryActivate()) {
+          this.input.consumePowerPress();
+        }
+      }
     }
 
+    this.power.update(dt);
     this.player.update(dt);
     this.camera.update(dt);
     this.chase.update(dt, this.player.position);

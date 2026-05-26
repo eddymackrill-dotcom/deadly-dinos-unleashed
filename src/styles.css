@@ -39,3 +39,18 @@ body {
     1.5px 0 rgba(60, 200, 255, 0.55);
   letter-spacing: 0.06em;
 }
+
+@keyframes power-pulse-kf {
+  0%, 100% {
+    filter: drop-shadow(0 0 2px rgba(98, 217, 154, 0.5));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(98, 217, 154, 0.85));
+    transform: scale(1.06);
+  }
+}
+
+.power-pulse {
+  animation: power-pulse-kf 1.4s ease-in-out infinite;
+}

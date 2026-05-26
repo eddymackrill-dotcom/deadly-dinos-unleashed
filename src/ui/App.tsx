@@ -240,6 +240,84 @@ function ChaseResultFlash() {
   );
 }
 
+function PowerIcon() {
+  const ready = useGameState((s) => s.powerReady);
+  const active = useGameState((s) => s.powerActive);
+  const pct = useGameState((s) => s.powerCooldownPercent);
+
+  const size = 56;
+  const r = size / 2 - 4;
+  const circumference = 2 * Math.PI * r;
+  const dashOffset = circumference * pct;
+
+  const ring = active ? "#ff5566" : ready ? "#62d99a" : "#ffd166";
+  const fill = active ? "rgba(255,80,100,0.18)" : "rgba(0,0,0,0.55)";
+
+  return (
+    <div className="absolute top-14 right-4 pointer-events-none select-none">
+      <div
+        className={`relative ${ready ? "power-pulse" : ""}`}
+        style={{ width: size, height: size }}
+      >
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill={fill} stroke="rgba(255,255,255,0.18)" strokeWidth={1.5} />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            fill="none"
+            stroke={ring}
+            strokeWidth={3.5}
+            strokeDasharray={circumference}
+            strokeDashoffset={dashOffset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            style={{ transition: "stroke-dashoffset 80ms linear" }}
+          />
+          <text
+            x="50%"
+            y="55%"
+            dominantBaseline="middle"
+            textAnchor="middle"
+            fill="#fde68a"
+            fontFamily="Bangers, sans-serif"
+            fontSize="22"
+          >
+            X
+          </text>
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function PowerBurstTint() {
+  const burstUntil = useGameState((s) => s.powerBurstUntil);
+  const [now, setNow] = useState(() => performance.now());
+
+  useEffect(() => {
+    if (burstUntil <= performance.now()) return;
+    let raf = 0;
+    const tick = () => {
+      setNow(performance.now());
+      if (performance.now() < burstUntil) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [burstUntil]);
+
+  if (now >= burstUntil) return null;
+  const remaining = burstUntil - now;
+  const opacity = Math.min(1, remaining / 200) * 0.4;
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        background: `radial-gradient(circle, rgba(255,60,80,${opacity}), rgba(0,0,0,0))`,
+      }}
+    />
+  );
+}
+
 function HiddenSecretsCounter() {
   const claimed = useGameState((s) => s.hiddenSecretsClaimed);
   const total = useGameState((s) => s.hiddenSecretsTotal);
@@ -299,10 +377,12 @@ function HUD() {
     <>
       <TrackingBar />
       <HiddenSecretsCounter />
+      <PowerIcon />
       <ChaseTimerBar />
       <StealthBar />
       <DefenseOverlay />
       <RewardPopup />
+      <PowerBurstTint />
       <ChaseResultFlash />
     </>
   );
