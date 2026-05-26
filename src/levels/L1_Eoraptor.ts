@@ -9,6 +9,7 @@ const NODE_CONFIGS: ScentNodeConfig[] = [
   { position: new THREE.Vector3(12, 0.4, 0), type: "collect", points: 100 },
   { position: new THREE.Vector3(28, 0.4, 0), type: "chase", points: 250 },
   { position: new THREE.Vector3(46, 0.4, 0), type: "collect", points: 100 },
+  { position: new THREE.Vector3(62, 0.4, 0), type: "stealth", points: 300 },
 ];
 
 function mulberry32(a: number) {

@@ -11,6 +11,7 @@ import { Dinosaur } from "../entities/Dinosaur";
 import { PreyAnimal } from "../entities/PreyAnimal";
 import { TrackingSystem } from "../systems/TrackingSystem";
 import { ChaseSystem } from "../systems/ChaseSystem";
+import { StealthSystem } from "../systems/StealthSystem";
 import { EORAPTOR, trackingDuration } from "../data/dinosaurs";
 import { useGameState } from "../state/gameState";
 import { commitMissionResult, getDinoSave, getMissionSave } from "../progression/Save";
@@ -55,6 +56,7 @@ export class Game {
   private postProcess: PostProcess;
   private tracking: TrackingSystem;
   private chase: ChaseSystem;
+  private stealth: StealthSystem;
   private inputLocked = false;
   readonly fx: GameFX;
   private rafId: number | null = null;
@@ -111,6 +113,23 @@ export class Game {
       },
     });
     this.chase.onResolved = (outcome) => {
+      const ev = this.level.sequence.resolveEncounter(outcome);
+      if (ev && ev.kind === "collected") this.applyCollected(ev);
+    };
+
+    this.stealth = new StealthSystem({
+      scene: this.scene.scene,
+      setChevronOverride: (x) => this.level.setChevronTargetOverride(x),
+      onCameraShake: (mag, dur) => this.camera.shake(mag, dur),
+      onGlitchSting: () => this.fx.catchSting(),
+      setPlayerInputLocked: (locked) => {
+        this.inputLocked = locked;
+      },
+      setPlayerSpeedMult: (m) => this.player.setSpeedMultiplier(m),
+      setPlayerTint: (color, mix, opacity) => this.player.setTint(color, mix, opacity),
+      sensesStat: EORAPTOR.stats.senses,
+    });
+    this.stealth.onResolved = (outcome) => {
       const ev = this.level.sequence.resolveEncounter(outcome);
       if (ev && ev.kind === "collected") this.applyCollected(ev);
     };
@@ -187,6 +206,7 @@ export class Game {
     this.player.update(dt);
     this.camera.update(dt);
     this.chase.update(dt, this.player.position);
+    this.stealth.update(dt, this.player.position);
     this.level.update({
       dt,
       camera: this.camera.camera,
@@ -221,9 +241,11 @@ export class Game {
     if (ev.kind === "collected") {
       this.applyCollected(ev);
     } else if (ev.kind === "encounterStarted") {
+      const facing: 1 | -1 = this.player.velocityX >= 0 ? 1 : -1;
       if (ev.nodeType === "chase") {
-        const facing: 1 | -1 = this.player.velocityX >= 0 ? 1 : -1;
         this.chase.start(ev.position.x, facing);
+      } else if (ev.nodeType === "stealth") {
+        this.stealth.start(ev.position.x, facing);
       }
     }
   }

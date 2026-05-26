@@ -3,7 +3,7 @@ import type { NodeResult, ScentNodeType } from "../levels/ScentSequence";
 
 export type MissionStatus = "playing" | "failed" | "complete";
 
-export type ChaseOutcome = "win" | "lose";
+export type ChaseOutcome = "win" | "lose" | "partial";
 
 export interface DinoStatsView {
   speed: number;
@@ -46,6 +46,10 @@ export interface MissionState {
   chaseResult: ChaseOutcome | null;
   chaseResultFlashUntil: number;
 
+  stealthActive: boolean;
+  stealthPercent: number;
+  stealthInBush: boolean;
+
   setTrackingPercent: (v: number) => void;
   setScentProgress: (collected: number, total: number) => void;
   setStatus: (s: MissionStatus) => void;
@@ -60,6 +64,9 @@ export interface MissionState {
   startChase: () => void;
   setChasePercent: (v: number) => void;
   endChase: (result: ChaseOutcome, flashUntil: number) => void;
+  startStealth: () => void;
+  setStealthState: (percent: number, inBush: boolean) => void;
+  endStealth: (result: ChaseOutcome, flashUntil: number) => void;
   /** Replace the entire results array from the sequence. */
   setScentResults: (results: NodeResult[]) => void;
   setPersistedTotals: (info: {
@@ -82,6 +89,9 @@ const initial: Omit<
   | "startChase"
   | "setChasePercent"
   | "endChase"
+  | "startStealth"
+  | "setStealthState"
+  | "endStealth"
   | "setScentResults"
   | "setPersistedTotals"
   | "setNewBests"
@@ -108,6 +118,10 @@ const initial: Omit<
   chasePercent: 1,
   chaseResult: null,
   chaseResultFlashUntil: 0,
+
+  stealthActive: false,
+  stealthPercent: 1,
+  stealthInBush: false,
 };
 
 export const useGameState = create<MissionState>((set) => ({
@@ -128,6 +142,17 @@ export const useGameState = create<MissionState>((set) => ({
   setChasePercent: (v) => set({ chasePercent: Math.max(0, Math.min(1, v)) }),
   endChase: (result, flashUntil) =>
     set({ chaseActive: false, chaseResult: result, chaseResultFlashUntil: flashUntil }),
+  startStealth: () =>
+    set({ stealthActive: true, stealthPercent: 1, stealthInBush: false, chaseResult: null }),
+  setStealthState: (percent, inBush) =>
+    set({ stealthPercent: Math.max(0, Math.min(1, percent)), stealthInBush: inBush }),
+  endStealth: (result, flashUntil) =>
+    set({
+      stealthActive: false,
+      stealthInBush: false,
+      chaseResult: result,
+      chaseResultFlashUntil: flashUntil,
+    }),
   setScentResults: (results) => {
     const points = results.reduce((s, r) => s + r.points, 0);
     set({ scentResults: results.map((r) => ({ ...r })), predatorPointsEarned: points });

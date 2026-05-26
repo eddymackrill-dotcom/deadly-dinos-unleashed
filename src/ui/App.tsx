@@ -84,6 +84,40 @@ function ChaseTimerBar() {
   );
 }
 
+function StealthBar() {
+  const active = useGameState((s) => s.stealthActive);
+  const pct = useGameState((s) => s.stealthPercent);
+  const inBush = useGameState((s) => s.stealthInBush);
+  if (!active) return null;
+  const danger = pct < 0.3;
+  const fill = inBush
+    ? "linear-gradient(90deg, #b6e3a4, #efff7c)"
+    : danger
+      ? "linear-gradient(90deg, #ffae42, #ff6a4d)"
+      : "linear-gradient(90deg, #ffe066, #ffd166)";
+  return (
+    <div className="absolute top-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 pointer-events-none select-none">
+      <div className="flex items-center gap-2">
+        <span className="text-xl" aria-hidden>
+          {inBush ? "🌿" : "👁"}
+        </span>
+        <div className="font-display text-amber-100 text-lg tracking-[0.3em] drop-shadow">
+          STEALTH
+        </div>
+      </div>
+      <div className="relative h-3 w-72 bg-black/55 rounded-full overflow-hidden border border-white/15">
+        <div
+          className="absolute left-0 top-0 bottom-0 transition-[width] duration-75 ease-linear"
+          style={{ width: `${pct * 100}%`, background: fill }}
+        />
+      </div>
+      <div className="font-ui text-xs text-white/70 tracking-wide">
+        {inBush ? "HIDDEN" : "EXPOSED"}
+      </div>
+    </div>
+  );
+}
+
 function ChaseResultFlash() {
   const result = useGameState((s) => s.chaseResult);
   const flashUntil = useGameState((s) => s.chaseResultFlashUntil);
@@ -130,6 +164,7 @@ function HUD() {
     <>
       <TrackingBar />
       <ChaseTimerBar />
+      <StealthBar />
       <ChaseResultFlash />
     </>
   );

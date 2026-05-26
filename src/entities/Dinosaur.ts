@@ -47,8 +47,58 @@ export class Dinosaur {
 
   private inAirArc: "rising" | "falling" | "grounded" = "grounded";
 
+  private speedMultiplier = 1;
+  private tintMaterials: {
+    mat: THREE.MeshLambertMaterial;
+    baseColor: THREE.Color;
+  }[] = [];
+
   constructor() {
     this.root.name = "Dinosaur";
+  }
+
+  /** Multiplier on top of MAX_SPEED. Use for stealth slow (0.5), dash boost (1.6). */
+  setSpeedMultiplier(m: number) {
+    this.speedMultiplier = Math.max(0, m);
+  }
+
+  /**
+   * Tint every mesh material toward `color` (additive ratio 0..1) and apply
+   * transparency. Pass `null` to clear tint and reset opacity to 1.
+   */
+  setTint(color: THREE.Color | null, mixAmount = 0.5, opacity = 1) {
+    if (this.tintMaterials.length === 0) {
+      // Lazily capture base colors the first time tint is requested.
+      this.captureTintMaterials();
+    }
+    for (const t of this.tintMaterials) {
+      if (color) {
+        const c = t.baseColor.clone().lerp(color, Math.max(0, Math.min(1, mixAmount)));
+        t.mat.color.copy(c);
+      } else {
+        t.mat.color.copy(t.baseColor);
+      }
+      const wantsTransparency = opacity < 1;
+      if (wantsTransparency !== t.mat.transparent) {
+        t.mat.transparent = wantsTransparency;
+        t.mat.needsUpdate = true;
+      }
+      t.mat.opacity = opacity;
+    }
+  }
+
+  private captureTintMaterials() {
+    this.root.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of mats) {
+        const lambert = m as THREE.MeshLambertMaterial;
+        if (lambert.color) {
+          this.tintMaterials.push({ mat: lambert, baseColor: lambert.color.clone() });
+        }
+      }
+    });
   }
 
   get velocityX(): number {
@@ -155,7 +205,7 @@ export class Dinosaur {
       this.skidTimer -= dt;
       targetVx = 0;
     } else {
-      targetVx = this.pendingMoveDir * MAX_SPEED;
+      targetVx = this.pendingMoveDir * MAX_SPEED * this.speedMultiplier;
     }
 
     const reversing =
