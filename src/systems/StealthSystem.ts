@@ -6,9 +6,27 @@ import { useGameState } from "../state/gameState";
 // Drain math: at senses=5 we want ~10s in the open to fully empty.
 //   drainRate = 1 / (BASE_DRAIN_SECONDS * (1 + senses * SENSES_DRAIN_FACTOR))
 // Hiding refills at REFILL_MULTIPLIER × drain rate (so 2× drain).
-const BASE_DRAIN_SECONDS = 6;
-const SENSES_DRAIN_FACTOR = 0.12;
-const REFILL_MULTIPLIER = 2;
+export const STEALTH_TUNING = {
+  BASE_DRAIN_SECONDS: 6,
+  SENSES_DRAIN_FACTOR: 0.12,
+  REFILL_MULTIPLIER: 2,
+};
+const BASE_DRAIN_SECONDS = STEALTH_TUNING.BASE_DRAIN_SECONDS;
+const SENSES_DRAIN_FACTOR = STEALTH_TUNING.SENSES_DRAIN_FACTOR;
+const REFILL_MULTIPLIER = STEALTH_TUNING.REFILL_MULTIPLIER;
+
+/** Pure bar-step used by StealthSystem.update() and the self-test. */
+export function stealthBarStep(
+  current: number,
+  dt: number,
+  inBush: boolean,
+  sensesStat: number,
+): number {
+  const drainPerSecond =
+    1 / (BASE_DRAIN_SECONDS * (1 + sensesStat * SENSES_DRAIN_FACTOR));
+  if (inBush) return Math.min(1, current + drainPerSecond * REFILL_MULTIPLIER * dt);
+  return Math.max(0, current - drainPerSecond * dt);
+}
 const BUSH_SPEED_MULT = 0.5;
 const PREY_SPAWN_AHEAD_X = 6;
 const CATCH_RADIUS = 1.8;
@@ -99,15 +117,12 @@ export class StealthSystem {
     if (this.phase !== "running" || !this.prey) return;
 
     const inBush = this.bushes.some((b) => b.contains(playerPosition.x));
-    const drainPerSecond =
-      1 / (BASE_DRAIN_SECONDS * (1 + this.cb.sensesStat * SENSES_DRAIN_FACTOR));
 
+    this.barPercent = stealthBarStep(this.barPercent, dt, inBush, this.cb.sensesStat);
     if (inBush) {
-      this.barPercent = Math.min(1, this.barPercent + drainPerSecond * REFILL_MULTIPLIER * dt);
       this.cb.setPlayerSpeedMult(BUSH_SPEED_MULT);
       this.cb.setPlayerTint(TINT_COLOR, TINT_MIX_BUSH, BUSH_OPACITY);
     } else {
-      this.barPercent = Math.max(0, this.barPercent - drainPerSecond * dt);
       this.cb.setPlayerSpeedMult(1);
       this.cb.setPlayerTint(TINT_COLOR, TINT_MIX_OPEN, 1);
     }

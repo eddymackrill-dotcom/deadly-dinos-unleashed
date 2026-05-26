@@ -13,6 +13,14 @@ const STAGGER_TINT_DURATION = 0.25;
 
 export type DefenseResult = "win" | "partial" | "lose";
 
+/** Pure helper: decide outcome from hit/miss counts. */
+export function defenseOutcomeFor(hits: number, total: number): DefenseResult {
+  if (total <= 0) return "lose";
+  if (hits === total) return "win";
+  if (hits === 0) return "lose";
+  return "partial";
+}
+
 export interface DefenseCallbacks {
   scene: THREE.Object3D;
   input: Input;

@@ -375,7 +375,39 @@ export function runScentSequenceSelfTest() {
   assert(lossResults[1].outcome === "lose" && lossResults[1].points === 0, "lose result recorded");
   log("lose path verified: outcome=lose, points=0, still advances");
 
+  // Phase 8: stealth + defense node types with partial outcomes.
+  const mixed = new ScentSequence([
+    { position: new THREE.Vector3(10, 0.4, 0), type: "stealth", points: 300 },
+    { position: new THREE.Vector3(20, 0.4, 0), type: "defense", points: 300 },
+  ]);
+  for (let x = 0; x < 12; x += step) mixed.tick(new THREE.Vector3(x, 0, 0), REACH);
+  assert(mixed.isEncounterRunning, "phase8: stealth encounter should be running");
+  const stealthEv = mixed.resolveEncounter("win");
+  assert(stealthEv?.kind === "collected", "phase8: stealth resolve event is collected");
+  if (stealthEv?.kind !== "collected") fail("phase8: unreachable");
+  assert(stealthEv.outcome === "win", "phase8: stealth outcome=win");
+  assert(stealthEv.points === 300, "phase8: stealth points=300");
+  log(`phase8: stealth resolved win +${stealthEv.points}`);
+
+  for (let x = 12; x < 22; x += step) mixed.tick(new THREE.Vector3(x, 0, 0), REACH);
+  assert(mixed.isEncounterRunning, "phase8: defense encounter should be running");
+  // Partial outcome with explicit points override (e.g. 2/4 hits = half points).
+  const defenseEv = mixed.resolveEncounter("partial", 150);
+  assert(defenseEv?.kind === "collected", "phase8: defense resolve event is collected");
+  if (defenseEv?.kind !== "collected") fail("phase8: unreachable");
+  assert(defenseEv.outcome === "partial", "phase8: defense outcome=partial");
+  assert(
+    defenseEv.points === 150,
+    `phase8: defense partial points override honored (got ${defenseEv.points})`,
+  );
+  assert(mixed.isComplete, "phase8: both nodes collected");
+  const mixedResults = mixed.getResults();
+  assert(mixedResults[0].outcome === "win" && mixedResults[0].points === 300, "phase8: result[0]");
+  assert(mixedResults[1].outcome === "partial" && mixedResults[1].points === 150, "phase8: result[1]");
+  assert(mixed.totalPointsEarned() === 450, "phase8: total = 300 + 150");
+  log("phase8: stealth(win) + defense(partial) recorded with correct points");
+
   console.log(
-    `[selftest] PASS — scent sequence matches spec. Sequence: 0/3 -> reach node 0 -> 1/3 -> reach node 1 -> chase starts -> chase wins -> 2/3 -> reach node 2 -> 3/3 -> complete.`,
+    `[selftest] PASS — scent sequence matches spec. Sequence: 0/3 -> reach node 0 -> 1/3 -> reach node 1 -> chase starts -> chase wins -> 2/3 -> reach node 2 -> 3/3 -> complete. Plus stealth+defense+partial coverage in phase 8.`,
   );
 }

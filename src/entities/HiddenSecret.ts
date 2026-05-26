@@ -78,10 +78,19 @@ export class HiddenSecret {
       return;
     }
     this.claimed = true;
-    gsap.killTweensOf(this.inner.position);
-    gsap.killTweensOf(this.inner.scale);
-    gsap
-      .timeline({ onComplete })
+    // gsap may be unavailable in the headless self-test runner. Fall back to
+    // an immediate completion rather than crashing — the visual is browser-only.
+    // gsap may be unavailable in the headless self-test runner. Fall back to
+    // an immediate completion rather than crashing — the visual is browser-only.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const g = gsap as any;
+    if (typeof g?.timeline !== "function") {
+      onComplete();
+      return;
+    }
+    g.killTweensOf?.(this.inner.position);
+    g.killTweensOf?.(this.inner.scale);
+    g.timeline({ onComplete })
       .to(this.inner.position, { y: 1.0, duration: 0.35, ease: "power2.out" })
       .to(this.inner.scale, { x: 0, y: 0, z: 0, duration: 0.25, ease: "power2.in" }, "-=0.15");
   }
