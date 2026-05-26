@@ -118,6 +118,87 @@ function StealthBar() {
   );
 }
 
+const ARROW_GLYPH: Record<string, string> = {
+  up: "↑",
+  down: "↓",
+  left: "←",
+  right: "→",
+};
+
+function DefenseOverlay() {
+  const active = useGameState((s) => s.defenseActive);
+  const prompt = useGameState((s) => s.defensePrompt);
+  const total = useGameState((s) => s.defenseTotalRounds);
+  const hits = useGameState((s) => s.defenseHits);
+  const misses = useGameState((s) => s.defenseMisses);
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    let raf = 0;
+    const loop = () => {
+      setTick((n) => n + 1);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [active]);
+
+  if (!active) return null;
+
+  let timerPct = 0;
+  if (prompt) {
+    const span = 700;
+    const remaining = prompt.deadline - performance.now();
+    timerPct = Math.max(0, Math.min(1, remaining / span));
+  }
+
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
+      <div className="font-display text-rose-100 text-2xl tracking-[0.35em] drop-shadow mb-4">
+        DEFEND
+      </div>
+      <div className="flex items-center gap-3 mb-3">
+        {Array.from({ length: total }).map((_, i) => {
+          const filled = i < hits + misses;
+          const ok = i < hits;
+          return (
+            <div
+              key={i}
+              className="w-3 h-3 rounded-full border border-white/40"
+              style={{
+                background: filled ? (ok ? "#62d99a" : "#ff5566") : "transparent",
+              }}
+            />
+          );
+        })}
+      </div>
+      {prompt && (
+        <>
+          <div
+            className="text-[140px] leading-none font-display drop-shadow-lg"
+            style={{ color: "#ffd166", textShadow: "0 0 16px rgba(255,209,102,0.55)" }}
+          >
+            {ARROW_GLYPH[prompt.arrow]}
+          </div>
+          <div className="relative h-2 w-56 mt-3 bg-black/60 rounded-full overflow-hidden border border-white/20">
+            <div
+              className="absolute left-0 top-0 bottom-0"
+              style={{
+                width: `${timerPct * 100}%`,
+                background:
+                  timerPct < 0.3
+                    ? "linear-gradient(90deg, #ff5566, #ff8e6a)"
+                    : "linear-gradient(90deg, #ffd166, #ffae42)",
+              }}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function ChaseResultFlash() {
   const result = useGameState((s) => s.chaseResult);
   const flashUntil = useGameState((s) => s.chaseResultFlashUntil);
@@ -135,24 +216,24 @@ function ChaseResultFlash() {
   }, [flashUntil]);
 
   if (result === null || now >= flashUntil) return null;
-  const isWin = result === "win";
+  let label = "ESCAPED";
+  let tint = "text-slate-200";
+  let bg = "radial-gradient(circle, rgba(120,120,160,0.15), rgba(0,0,0,0.55))";
+  if (result === "win") {
+    label = "CAUGHT!";
+    tint = "text-rose-100";
+    bg = "radial-gradient(circle, rgba(255,200,255,0.25), rgba(0,0,0,0.45))";
+  } else if (result === "partial") {
+    label = "HELD GROUND";
+    tint = "text-amber-100";
+    bg = "radial-gradient(circle, rgba(255,220,120,0.18), rgba(0,0,0,0.5))";
+  }
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-      <div
-        className="absolute inset-0"
-        style={{
-          background: isWin
-            ? "radial-gradient(circle, rgba(255,200,255,0.25), rgba(0,0,0,0.45))"
-            : "radial-gradient(circle, rgba(120,120,160,0.15), rgba(0,0,0,0.55))",
-        }}
-      />
+      <div className="absolute inset-0" style={{ background: bg }} />
       <div className="relative text-center select-none px-8 py-6">
-        <div
-          className={`text-7xl font-display tracking-widest title-glitch ${
-            isWin ? "text-rose-100" : "text-slate-200"
-          }`}
-        >
-          {isWin ? "CAUGHT!" : "ESCAPED"}
+        <div className={`text-7xl font-display tracking-widest title-glitch ${tint}`}>
+          {label}
         </div>
       </div>
     </div>
@@ -165,6 +246,7 @@ function HUD() {
       <TrackingBar />
       <ChaseTimerBar />
       <StealthBar />
+      <DefenseOverlay />
       <ChaseResultFlash />
     </>
   );

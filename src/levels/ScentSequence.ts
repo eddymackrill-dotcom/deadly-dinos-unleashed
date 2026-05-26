@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 export type ScentNodeType = "collect" | "chase" | "stealth" | "defense";
 
-export type EncounterOutcome = "win" | "lose";
+export type EncounterOutcome = "win" | "lose" | "partial";
 
 export interface ScentNodeConfig {
   position: THREE.Vector3;
@@ -58,6 +58,7 @@ export class ScentSequence {
   private readonly configs: ScentNodeConfig[];
   private readonly collectedFlags: boolean[];
   private readonly outcomes: (EncounterOutcome | null)[];
+  private readonly points: number[];
   private encounterRunning = false;
 
   constructor(configs: ScentNodeConfig[]) {
@@ -68,6 +69,7 @@ export class ScentSequence {
     }));
     this.collectedFlags = configs.map(() => false);
     this.outcomes = configs.map(() => null);
+    this.points = configs.map(() => 0);
   }
 
   get total(): number {
@@ -106,6 +108,12 @@ export class ScentSequence {
     };
   }
 
+  /** Points configured for the active node (0 if no active node). */
+  getActivePoints(): number {
+    const idx = this.getActiveIndex();
+    return idx === null ? 0 : this.configs[idx].points;
+  }
+
   /**
    * Per-frame tick. Returns an event if proximity to the active node triggers
    * something this frame, otherwise null. A `collected` event means the node
@@ -123,7 +131,7 @@ export class ScentSequence {
     if (Math.abs(dx) > reachRadius) return null;
 
     if (active.type === "collect") {
-      this.markCollected(active.index, "win");
+      this.markCollected(active.index, "win", this.configs[active.index].points);
       return {
         kind: "collected",
         nodeIndex: active.index,
@@ -147,20 +155,28 @@ export class ScentSequence {
    * completed, etc). Marks the active node collected with the given outcome
    * and clears the encounter flag. Returns the `collected` event so the
    * caller can record it (refill tracking, etc.).
+   *
+   * `pointsOverride` lets a partial outcome (e.g. defense QTE with some misses)
+   * award a fraction of the configured points. Ignored for "lose" (always 0)
+   * and optional for "win" (defaults to the configured points).
    */
-  resolveEncounter(outcome: EncounterOutcome): SequenceEvent | null {
+  resolveEncounter(outcome: EncounterOutcome, pointsOverride?: number): SequenceEvent | null {
     if (!this.encounterRunning) return null;
     const idx = this.getActiveIndex();
     if (idx === null) return null;
     this.markCollected(idx, outcome);
     this.encounterRunning = false;
     const cfg = this.configs[idx];
+    let points = 0;
+    if (outcome === "win") points = pointsOverride ?? cfg.points;
+    else if (outcome === "partial") points = Math.round(pointsOverride ?? cfg.points * 0.5);
+    this.points[idx] = points;
     return {
       kind: "collected",
       nodeIndex: idx,
       nodeType: cfg.type,
       outcome,
-      points: outcome === "win" ? cfg.points : 0,
+      points,
     };
   }
 
@@ -178,7 +194,7 @@ export class ScentSequence {
           index: i,
           type: this.configs[i].type,
           outcome,
-          points: outcome === "win" ? this.configs[i].points : 0,
+          points: this.points[i],
         });
       }
     }
@@ -196,10 +212,11 @@ export class ScentSequence {
     this.configs.forEach((c, i) => fn(c, i));
   }
 
-  private markCollected(idx: number, outcome: EncounterOutcome) {
+  private markCollected(idx: number, outcome: EncounterOutcome, points = 0) {
     if (this.collectedFlags[idx]) return;
     this.collectedFlags[idx] = true;
     this.outcomes[idx] = outcome;
+    this.points[idx] = points;
   }
 }
 

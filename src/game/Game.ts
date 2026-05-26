@@ -12,6 +12,7 @@ import { PreyAnimal } from "../entities/PreyAnimal";
 import { TrackingSystem } from "../systems/TrackingSystem";
 import { ChaseSystem } from "../systems/ChaseSystem";
 import { StealthSystem } from "../systems/StealthSystem";
+import { DefenseSystem } from "../systems/DefenseSystem";
 import { EORAPTOR, trackingDuration } from "../data/dinosaurs";
 import { useGameState } from "../state/gameState";
 import { commitMissionResult, getDinoSave, getMissionSave } from "../progression/Save";
@@ -57,6 +58,7 @@ export class Game {
   private tracking: TrackingSystem;
   private chase: ChaseSystem;
   private stealth: StealthSystem;
+  private defense: DefenseSystem;
   private inputLocked = false;
   readonly fx: GameFX;
   private rafId: number | null = null;
@@ -134,6 +136,29 @@ export class Game {
       if (ev && ev.kind === "collected") this.applyCollected(ev);
     };
 
+    this.defense = new DefenseSystem({
+      scene: this.scene.scene,
+      input: this.input,
+      setChevronOverride: (x) => this.level.setChevronTargetOverride(x),
+      setPlayerInputLocked: (locked) => {
+        this.inputLocked = locked;
+      },
+      setPlayerTint: (color, mix, opacity) => this.player.setTint(color, mix, opacity),
+      onCameraShake: (mag, dur) => this.camera.shake(mag, dur),
+      onGlitchSting: () => this.fx.catchSting(),
+      toughnessStat: EORAPTOR.stats.toughness,
+    });
+    this.defense.onResolved = (outcome) => {
+      const basePoints = this.level.sequence.getActivePoints();
+      const ratio = this.defense.partialPointsRatio();
+      const partialPoints = Math.round(basePoints * ratio);
+      const ev = this.level.sequence.resolveEncounter(
+        outcome,
+        outcome === "partial" ? partialPoints : undefined,
+      );
+      if (ev && ev.kind === "collected") this.applyCollected(ev);
+    };
+
     void this.player.load({
       url: "/models/eoraptor.glb",
       targetHeight: 0.8,
@@ -207,6 +232,7 @@ export class Game {
     this.camera.update(dt);
     this.chase.update(dt, this.player.position);
     this.stealth.update(dt, this.player.position);
+    this.defense.update(dt);
     this.level.update({
       dt,
       camera: this.camera.camera,
@@ -246,6 +272,8 @@ export class Game {
         this.chase.start(ev.position.x, facing);
       } else if (ev.nodeType === "stealth") {
         this.stealth.start(ev.position.x, facing);
+      } else if (ev.nodeType === "defense") {
+        this.defense.start(ev.position.x, facing);
       }
     }
   }

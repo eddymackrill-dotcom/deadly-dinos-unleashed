@@ -1,9 +1,17 @@
 import { create } from "zustand";
 import type { NodeResult, ScentNodeType } from "../levels/ScentSequence";
+import type { ArrowDir } from "../game/Input";
 
 export type MissionStatus = "playing" | "failed" | "complete";
 
 export type ChaseOutcome = "win" | "lose" | "partial";
+
+export interface DefensePromptView {
+  arrow: ArrowDir;
+  round: number;
+  total: number;
+  deadline: number;
+}
 
 export interface DinoStatsView {
   speed: number;
@@ -50,6 +58,12 @@ export interface MissionState {
   stealthPercent: number;
   stealthInBush: boolean;
 
+  defenseActive: boolean;
+  defenseTotalRounds: number;
+  defensePrompt: DefensePromptView | null;
+  defenseHits: number;
+  defenseMisses: number;
+
   setTrackingPercent: (v: number) => void;
   setScentProgress: (collected: number, total: number) => void;
   setStatus: (s: MissionStatus) => void;
@@ -67,6 +81,14 @@ export interface MissionState {
   startStealth: () => void;
   setStealthState: (percent: number, inBush: boolean) => void;
   endStealth: (result: ChaseOutcome, flashUntil: number) => void;
+  startDefense: (totalRounds: number) => void;
+  setDefensePrompt: (prompt: DefensePromptView | null) => void;
+  endDefense: (
+    result: ChaseOutcome,
+    hits: number,
+    misses: number,
+    flashUntil: number,
+  ) => void;
   /** Replace the entire results array from the sequence. */
   setScentResults: (results: NodeResult[]) => void;
   setPersistedTotals: (info: {
@@ -92,6 +114,9 @@ const initial: Omit<
   | "startStealth"
   | "setStealthState"
   | "endStealth"
+  | "startDefense"
+  | "setDefensePrompt"
+  | "endDefense"
   | "setScentResults"
   | "setPersistedTotals"
   | "setNewBests"
@@ -122,6 +147,12 @@ const initial: Omit<
   stealthActive: false,
   stealthPercent: 1,
   stealthInBush: false,
+
+  defenseActive: false,
+  defenseTotalRounds: 0,
+  defensePrompt: null,
+  defenseHits: 0,
+  defenseMisses: 0,
 };
 
 export const useGameState = create<MissionState>((set) => ({
@@ -150,6 +181,25 @@ export const useGameState = create<MissionState>((set) => ({
     set({
       stealthActive: false,
       stealthInBush: false,
+      chaseResult: result,
+      chaseResultFlashUntil: flashUntil,
+    }),
+  startDefense: (totalRounds) =>
+    set({
+      defenseActive: true,
+      defenseTotalRounds: totalRounds,
+      defenseHits: 0,
+      defenseMisses: 0,
+      defensePrompt: null,
+      chaseResult: null,
+    }),
+  setDefensePrompt: (prompt) => set({ defensePrompt: prompt }),
+  endDefense: (result, hits, misses, flashUntil) =>
+    set({
+      defenseActive: false,
+      defensePrompt: null,
+      defenseHits: hits,
+      defenseMisses: misses,
       chaseResult: result,
       chaseResultFlashUntil: flashUntil,
     }),
