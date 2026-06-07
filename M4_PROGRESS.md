@@ -107,3 +107,20 @@ secrets:
   roles) as a consequence.
 - Only Eoraptor is launched until Mission Select (chunk 5) passes a `dinoId`;
   the other three level configs are exercised by the chunk-7 simulation self-test.
+
+### Chunk 5 — Mission Select screen ✅
+New app flow: title card → Mission Select → play → (score summary) → back to select.
+`main.ts` now owns the Game lifecycle (creates `new Game(canvas, dinoId)` on
+select, disposes on return); `App.tsx` is a 3-screen state machine
+(title/select/playing). `MissionSelect.tsx` renders 4 cards (name, era+region,
+stat bars, power name+desc, completion %, points, SELECT). Lock rule: Eoraptor
+open; each next unlocks at ≥50% of the previous mission. Score Summary MISSIONS
+button returns to select; RESTART relaunches the same dino. A per-mission intro
+card (driven by gameState) replays on each launch.
+
+**Deferred / deviations (chunk 5):**
+- **Card art** is the biome sky-gradient panel + the dino's name, not a rendered
+  model preview. Live per-card mini-scenes / build-time PNGs deferred (M6) for
+  the perf floor.
+- Each mission swaps in a fresh `<canvas>` (a WebGL canvas only yields one
+  context, so the element can't be safely reused across Game instances).

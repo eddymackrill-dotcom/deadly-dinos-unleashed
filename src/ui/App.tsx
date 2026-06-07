@@ -5,10 +5,15 @@ import "@fontsource/bangers";
 import "@fontsource/inter";
 import { useGameState, type EncounterSource } from "../state/gameState";
 import type { ArrowDir } from "../game/Input";
+import type { DinoId } from "../data/dinosaurs";
 import { ScoreSummary } from "./ScoreSummary";
+import { MissionSelect } from "./MissionSelect";
 
-interface AppProps {
-  onTitleStart: () => void;
+export interface UICallbacks {
+  /** Create + start the Game for the chosen dino. */
+  onStartMission: (dinoId: DinoId) => void;
+  /** Dispose the running Game and return to Mission Select. */
+  onReturnToSelect: () => void;
 }
 
 function TrackingBar() {
@@ -574,6 +579,7 @@ function HUD() {
   );
 }
 
+/** Full-game title card, shown once before Mission Select. */
 function TitleCard({ onComplete }: { onComplete: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -581,60 +587,98 @@ function TitleCard({ onComplete }: { onComplete: () => void }) {
     if (!ref.current) return;
     const el = ref.current;
     const tl = gsap.timeline({ onComplete });
-    tl.fromTo(
-      el,
-      { opacity: 0, scale: 0.96 },
-      { opacity: 1, scale: 1, duration: 0.6, ease: "power2.out" },
-    );
-    tl.to(el, { duration: 2.0 });
-    tl.to(el, { opacity: 0, scale: 1.02, duration: 0.6, ease: "power2.in" });
+    tl.fromTo(el, { opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power2.out" });
+    tl.to(el, { duration: 1.6 });
+    tl.to(el, { opacity: 0, scale: 1.02, duration: 0.5, ease: "power2.in" });
     return () => {
       tl.kill();
     };
   }, [onComplete]);
 
   return (
-    <div
-      ref={ref}
-      className="absolute inset-0 flex items-center justify-center pointer-events-none"
-      style={{ opacity: 0 }}
-    >
+    <div ref={ref} className="absolute inset-0 flex items-center justify-center pointer-events-none bg-[#0b2a2a]" style={{ opacity: 0 }}>
       <div className="text-center select-none">
-        <div className="text-5xl md:text-7xl font-display text-amber-100 tracking-wider title-glitch">
-          MISSION 1
-        </div>
+        <div className="text-6xl md:text-8xl font-display text-amber-100 tracking-wider title-glitch">DEADLY DINOS</div>
+        <div className="mt-2 text-3xl md:text-5xl font-display text-orange-300 tracking-[0.3em] title-glitch">UNLEASHED</div>
+      </div>
+    </div>
+  );
+}
+
+/** Per-mission intro card, driven by gameState; replays each time a mission starts. */
+function MissionIntro({ runKey }: { runKey: number }) {
+  const dinoName = useGameState((s) => s.dinoName);
+  const era = useGameState((s) => s.era);
+  const region = useGameState((s) => s.region);
+  const ref = useRef<HTMLDivElement>(null);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    setDone(false);
+    if (!ref.current) return;
+    const el = ref.current;
+    const tl = gsap.timeline({ onComplete: () => setDone(true) });
+    tl.fromTo(el, { opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1, duration: 0.6, ease: "power2.out" });
+    tl.to(el, { duration: 1.8 });
+    tl.to(el, { opacity: 0, scale: 1.02, duration: 0.5, ease: "power2.in" });
+    return () => {
+      tl.kill();
+    };
+  }, [runKey]);
+
+  if (done) return null;
+  return (
+    <div ref={ref} className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ opacity: 0 }}>
+      <div className="text-center select-none">
+        <div className="text-5xl md:text-7xl font-display text-amber-100 tracking-wider title-glitch">{dinoName}</div>
         <div className="mt-3 text-base md:text-xl font-display text-amber-200/85 tracking-widest">
-          EORAPTOR · ARGENTINA · 230 MILLION YEARS AGO
+          {era.toUpperCase()} · {region.toUpperCase()}
         </div>
       </div>
     </div>
   );
 }
 
-function App({ onTitleStart }: AppProps) {
-  const [showTitle, setShowTitle] = useState(true);
-  const firedRef = useRef(false);
+type Screen = "title" | "select" | "playing";
 
-  useEffect(() => {
-    if (firedRef.current) return;
-    firedRef.current = true;
-    onTitleStart();
-  }, [onTitleStart]);
+function App({ onStartMission, onReturnToSelect }: UICallbacks) {
+  const [screen, setScreen] = useState<Screen>("title");
+  const [currentDino, setCurrentDino] = useState<DinoId>("eoraptor");
+  // Bumped on every (re)start so MissionIntro re-plays even for the same dino.
+  const [runKey, setRunKey] = useState(0);
 
-  const handleRestart = () => window.location.reload();
-  const handleMissions = () => window.location.reload();
+  const launch = (id: DinoId) => {
+    setCurrentDino(id);
+    onStartMission(id);
+    setRunKey((k) => k + 1);
+    setScreen("playing");
+  };
+
+  if (screen === "title") {
+    return <TitleCard onComplete={() => setScreen("select")} />;
+  }
+
+  if (screen === "select") {
+    return <MissionSelect onSelect={launch} />;
+  }
 
   return (
     <>
       <HUD />
-      {showTitle && <TitleCard onComplete={() => setShowTitle(false)} />}
-      <ScoreSummary onRestart={handleRestart} onMissions={handleMissions} />
+      <MissionIntro runKey={runKey} />
+      <ScoreSummary
+        onRestart={() => launch(currentDino)}
+        onMissions={() => {
+          onReturnToSelect();
+          setScreen("select");
+        }}
+      />
     </>
   );
 }
 
-export function mountUI(rootEl: HTMLElement, onTitleStart: () => void) {
+export function mountUI(rootEl: HTMLElement, callbacks: UICallbacks) {
   const root = createRoot(rootEl);
-  root.render(<App onTitleStart={onTitleStart} />);
+  root.render(<App {...callbacks} />);
   return root;
 }
