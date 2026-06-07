@@ -6,6 +6,9 @@ export type MissionStatus = "playing" | "failed" | "complete";
 
 export type ChaseOutcome = "win" | "lose" | "partial";
 
+/** Which encounter produced the current result flash — picks the right verb. */
+export type EncounterSource = "chase" | "stealth" | "defense";
+
 export interface DefensePromptView {
   arrow: ArrowDir;
   round: number;
@@ -72,6 +75,8 @@ export interface MissionState {
   chasePercent: number;
   chaseResult: ChaseOutcome | null;
   chaseResultFlashUntil: number;
+  /** Which encounter the active result flash came from (verb selection). */
+  chaseResultSource: EncounterSource | null;
   /** Overrides the derived result-flash label (e.g. "STEALTH BROKEN"). */
   chaseResultLabel: string | null;
 
@@ -193,6 +198,7 @@ const initial: Omit<
   chasePercent: 1,
   chaseResult: null,
   chaseResultFlashUntil: 0,
+  chaseResultSource: null,
   chaseResultLabel: null,
 
   stealthActive: false,
@@ -235,7 +241,12 @@ export const useGameState = create<MissionState>((set) => ({
     set({ chaseActive: true, chasePercent: 1, chaseResult: null, chaseResultLabel: null }),
   setChasePercent: (v) => set({ chasePercent: Math.max(0, Math.min(1, v)) }),
   endChase: (result, flashUntil) =>
-    set({ chaseActive: false, chaseResult: result, chaseResultFlashUntil: flashUntil }),
+    set({
+      chaseActive: false,
+      chaseResult: result,
+      chaseResultFlashUntil: flashUntil,
+      chaseResultSource: "chase",
+    }),
   setResultLabelOverride: (label) => set({ chaseResultLabel: label }),
   startStealth: () =>
     set({
@@ -253,6 +264,7 @@ export const useGameState = create<MissionState>((set) => ({
       stealthInBush: false,
       chaseResult: result,
       chaseResultFlashUntil: flashUntil,
+      chaseResultSource: "stealth",
     }),
   startDefense: (totalRounds, showInstructions) =>
     set({
@@ -278,6 +290,7 @@ export const useGameState = create<MissionState>((set) => ({
       defenseFeedback: null,
       chaseResult: result,
       chaseResultFlashUntil: flashUntil,
+      chaseResultSource: "defense",
     }),
   setHiddenSecretsProgress: (claimed, total) =>
     set({ hiddenSecretsClaimed: claimed, hiddenSecretsTotal: total }),

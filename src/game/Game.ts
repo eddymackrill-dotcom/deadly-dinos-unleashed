@@ -271,10 +271,9 @@ export class Game {
       }
     }
 
-    // Quick Dash (X) is a FREE-MOVEMENT power — decoupled from `inputLocked` so
-    // a chase (or its win-resolve freeze) can never swallow it. The defense QTE
-    // is the only state that locks non-arrow input, so it's the only gate here.
-    // Hold-to-activate: a fresh press starts it while ready; releasing X ends it.
+    // Quick Dash (X) is HOLD-TO-ACTIVATE and a FREE-MOVEMENT power. ACTIVATION
+    // is gated by the defense QTE (the only state that locks non-arrow input) so
+    // a chase can never swallow it. A fresh press starts the dash while ready.
     if (!this.defense.isActive) {
       const powerAgeMs = performance.now() - this.input.powerPressedAt();
       if (powerAgeMs <= JUMP_BUFFER_MS && this.power.tryActivate()) {
@@ -285,9 +284,12 @@ export class Game {
           this.stealth.spook();
         }
       }
-      // Release the dash the moment X comes up (no-op unless currently active).
-      if (!this.input.powerHeld) this.power.release();
     }
+    // RELEASE is unconditional and runs every frame X is not held — the +60%
+    // boost can NEVER persist unless X is physically down this frame. This is
+    // the hard guarantee that scent collection (or any state) can't leave a
+    // speed multiplier applied: only a live X-hold drives the dash.
+    if (!this.input.powerHeld) this.power.release();
 
     this.power.update(dt);
     this.player.update(dt);

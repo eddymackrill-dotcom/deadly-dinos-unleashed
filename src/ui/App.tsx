@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import gsap from "gsap";
 import "@fontsource/bangers";
 import "@fontsource/inter";
-import { useGameState } from "../state/gameState";
+import { useGameState, type EncounterSource } from "../state/gameState";
 import type { ArrowDir } from "../game/Input";
 import { ScoreSummary } from "./ScoreSummary";
 
@@ -119,14 +119,44 @@ function StealthBar() {
   );
 }
 
-const ARROW_GLYPH: Record<ArrowDir, string> = {
-  up: "↑",
-  down: "↓",
-  left: "←",
-  right: "→",
+// Single arrow asset rotated per direction — guarantees all 4 render at
+// identical pixel dimensions (unicode glyphs vary in size per direction).
+const ARROW_ROTATION: Record<ArrowDir, number> = {
+  up: 0,
+  right: 90,
+  down: 180,
+  left: 270,
 };
 
+const ARROW_SIZE = 150;
 const QTE_CYAN = "#22d3ee";
+
+function ArrowIcon({
+  dir,
+  size = ARROW_SIZE,
+  color,
+  glow,
+}: {
+  dir: ArrowDir;
+  size?: number;
+  color: string;
+  glow?: string;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      style={{
+        transform: `rotate(${ARROW_ROTATION[dir]}deg)`,
+        display: "block",
+        filter: glow ? `drop-shadow(0 0 22px ${glow})` : undefined,
+      }}
+    >
+      <path d="M50 8 L88 50 L66 50 L66 92 L34 92 L34 50 L12 50 Z" fill={color} />
+    </svg>
+  );
+}
 
 /** Screen-edge glow strip in the direction of the active arrow. */
 function EdgeGlow({ dir }: { dir: ArrowDir }) {
@@ -194,9 +224,8 @@ function ArrowPrompt({
       <div
         key={`${arrow}-${deadline}`}
         className="absolute inset-0 flex items-center justify-center qte-punch"
-        style={{ fontSize: 150, lineHeight: 1, color: QTE_CYAN, textShadow: `0 0 24px rgba(34,211,238,0.7)` }}
       >
-        {ARROW_GLYPH[arrow]}
+        <ArrowIcon dir={arrow} color={QTE_CYAN} glow="rgba(34,211,238,0.7)" />
       </div>
     </div>
   );
@@ -209,11 +238,8 @@ function FeedbackArrow({ arrow, result }: { arrow: ArrowDir; result: "hit" | "la
   const anim = result === "miss" ? "qte-shake" : "qte-pop";
   return (
     <div className="relative" style={{ width: 220, height: 220 }}>
-      <div
-        className={`absolute inset-0 flex items-center justify-center ${anim}`}
-        style={{ fontSize: 150, lineHeight: 1, color, textShadow: `0 0 28px rgba(${glow},0.85)` }}
-      >
-        {ARROW_GLYPH[arrow]}
+      <div className={`absolute inset-0 flex items-center justify-center ${anim}`}>
+        <ArrowIcon dir={arrow} color={color} glow={`rgba(${glow},0.85)`} />
       </div>
     </div>
   );
@@ -306,9 +332,17 @@ function DefenseOverlay() {
   );
 }
 
+// Per-encounter verbs — each mechanic gets its own win/lose language.
+const RESULT_VERBS: Record<EncounterSource, { win: string; lose: string }> = {
+  chase: { win: "CAUGHT!", lose: "ESCAPED!" },
+  stealth: { win: "POUNCED!", lose: "SPOTTED!" },
+  defense: { win: "DEFENDED!", lose: "OVERPOWERED!" },
+};
+
 function ChaseResultFlash() {
   const result = useGameState((s) => s.chaseResult);
   const flashUntil = useGameState((s) => s.chaseResultFlashUntil);
+  const source = useGameState((s) => s.chaseResultSource);
   const labelOverride = useGameState((s) => s.chaseResultLabel);
   const [now, setNow] = useState(() => performance.now());
 
@@ -324,17 +358,23 @@ function ChaseResultFlash() {
   }, [flashUntil]);
 
   if (result === null || now >= flashUntil) return null;
-  let label = "ESCAPED";
-  let tint = "text-slate-200";
-  let bg = "radial-gradient(circle, rgba(120,120,160,0.15), rgba(0,0,0,0.55))";
+  const verbs = source ? RESULT_VERBS[source] : RESULT_VERBS.chase;
+  let label: string;
+  let tint: string;
+  let bg: string;
   if (result === "win") {
-    label = "CAUGHT!";
+    label = verbs.win;
     tint = "text-rose-100";
     bg = "radial-gradient(circle, rgba(255,200,255,0.25), rgba(0,0,0,0.45))";
   } else if (result === "partial") {
+    // Only defense yields a partial (some arrows landed) — held the line.
     label = "HELD GROUND";
     tint = "text-amber-100";
     bg = "radial-gradient(circle, rgba(255,220,120,0.18), rgba(0,0,0,0.5))";
+  } else {
+    label = verbs.lose;
+    tint = "text-slate-200";
+    bg = "radial-gradient(circle, rgba(120,120,160,0.15), rgba(0,0,0,0.55))";
   }
   // An explicit override (e.g. dash blowing your cover) wins, with an alarm tint.
   if (labelOverride) {
