@@ -1,6 +1,10 @@
 import * as THREE from "three";
 import { stealthBarStep } from "../systems/StealthSystem";
-import { defenseOutcomeFor } from "../systems/DefenseSystem";
+import {
+  defenseOutcomeFor,
+  defenseScore,
+  defenseOutcomeFromResults,
+} from "../systems/DefenseSystem";
 import { PowerSystem } from "../systems/PowerSystem";
 import { HiddenSecretsSystem, type SecretConfig } from "../systems/HiddenSecretsSystem";
 import { useGameState } from "../state/gameState";
@@ -66,6 +70,34 @@ function runDefenseOutcomeTest() {
   assert(defenseOutcomeFor(0, 0) === "lose", `${tag}: 0/0 → lose`);
 
   console.log(`${tag} 4/4=win, 3/4=partial, 0/4=lose — OK`);
+
+  // Layer-3 late-hit scoring: late hits are worth half a point.
+  const ROUNDS = 3;
+  assert(defenseScore(["hit", "hit", "hit"]) === 3, `${tag}: 3 hits → score 3`);
+  assert(defenseScore(["hit", "late", "miss"]) === 1.5, `${tag}: hit+late+miss → 1.5`);
+  assert(defenseScore(["late", "late", "late"]) === 1.5, `${tag}: 3 lates → 1.5`);
+
+  assert(
+    defenseOutcomeFromResults(["hit", "hit", "hit"], ROUNDS) === "win",
+    `${tag}: all full hits → win`,
+  );
+  assert(
+    defenseOutcomeFromResults(["hit", "late", "hit"], ROUNDS) === "partial",
+    `${tag}: a late among hits → partial (not a clean win)`,
+  );
+  assert(
+    defenseOutcomeFromResults(["late", "late", "late"], ROUNDS) === "partial",
+    `${tag}: all lates → partial`,
+  );
+  assert(
+    defenseOutcomeFromResults(["miss", "miss", "miss"], ROUNDS) === "lose",
+    `${tag}: all misses → lose`,
+  );
+  assert(
+    defenseOutcomeFromResults(["miss", "late", "miss"], ROUNDS) === "partial",
+    `${tag}: a single late rescues from lose → partial`,
+  );
+  console.log(`${tag} late-hit scoring: late=½pt, any credit=partial, all-full=win — OK`);
 }
 
 function runHiddenSecretsTest() {

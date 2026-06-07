@@ -10,7 +10,26 @@ export interface DefensePromptView {
   arrow: ArrowDir;
   round: number;
   total: number;
-  deadline: number;
+  startedAt: number;
+  deadline: number; // end of full-credit window
+  graceDeadline: number; // end of late-credit (half-points) window
+  windowMs: number;
+}
+
+/** Per-round QTE outcome — drives the round dots and feedback flash. */
+export type DefenseRoundResult = "hit" | "late" | "miss";
+
+/** Layer-1 "clear the moment" intro: banner + optional instructions + 3-2-1. */
+export interface DefenseIntroView {
+  showInstructions: boolean; // first encounter of the session only
+  countdown: number | null; // 3,2,1 then null on the frame the first prompt fires
+}
+
+/** Transient colour flash on the just-resolved arrow during intermission. */
+export interface DefenseFeedbackView {
+  arrow: ArrowDir;
+  result: DefenseRoundResult;
+  at: number;
 }
 
 export interface DinoStatsView {
@@ -60,9 +79,10 @@ export interface MissionState {
 
   defenseActive: boolean;
   defenseTotalRounds: number;
+  defenseIntro: DefenseIntroView | null;
   defensePrompt: DefensePromptView | null;
-  defenseHits: number;
-  defenseMisses: number;
+  defenseRoundResults: DefenseRoundResult[];
+  defenseFeedback: DefenseFeedbackView | null;
 
   hiddenSecretsClaimed: number;
   hiddenSecretsTotal: number;
@@ -91,14 +111,12 @@ export interface MissionState {
   startStealth: () => void;
   setStealthState: (percent: number, inBush: boolean) => void;
   endStealth: (result: ChaseOutcome, flashUntil: number) => void;
-  startDefense: (totalRounds: number) => void;
+  startDefense: (totalRounds: number, showInstructions: boolean) => void;
+  setDefenseIntro: (intro: DefenseIntroView | null) => void;
   setDefensePrompt: (prompt: DefensePromptView | null) => void;
-  endDefense: (
-    result: ChaseOutcome,
-    hits: number,
-    misses: number,
-    flashUntil: number,
-  ) => void;
+  pushDefenseRoundResult: (result: DefenseRoundResult) => void;
+  setDefenseFeedback: (feedback: DefenseFeedbackView | null) => void;
+  endDefense: (result: ChaseOutcome, flashUntil: number) => void;
   setHiddenSecretsProgress: (claimed: number, total: number) => void;
   addSecretPoints: (points: number) => void;
   pushRewardPopup: (text: string) => void;
@@ -136,7 +154,10 @@ const initial: Omit<
   | "setStealthState"
   | "endStealth"
   | "startDefense"
+  | "setDefenseIntro"
   | "setDefensePrompt"
+  | "pushDefenseRoundResult"
+  | "setDefenseFeedback"
   | "endDefense"
   | "setHiddenSecretsProgress"
   | "addSecretPoints"
@@ -175,9 +196,10 @@ const initial: Omit<
 
   defenseActive: false,
   defenseTotalRounds: 0,
+  defenseIntro: null,
   defensePrompt: null,
-  defenseHits: 0,
-  defenseMisses: 0,
+  defenseRoundResults: [],
+  defenseFeedback: null,
 
   hiddenSecretsClaimed: 0,
   hiddenSecretsTotal: 0,
@@ -219,22 +241,27 @@ export const useGameState = create<MissionState>((set) => ({
       chaseResult: result,
       chaseResultFlashUntil: flashUntil,
     }),
-  startDefense: (totalRounds) =>
+  startDefense: (totalRounds, showInstructions) =>
     set({
       defenseActive: true,
       defenseTotalRounds: totalRounds,
-      defenseHits: 0,
-      defenseMisses: 0,
+      defenseIntro: { showInstructions, countdown: null },
       defensePrompt: null,
+      defenseRoundResults: [],
+      defenseFeedback: null,
       chaseResult: null,
     }),
+  setDefenseIntro: (intro) => set({ defenseIntro: intro }),
   setDefensePrompt: (prompt) => set({ defensePrompt: prompt }),
-  endDefense: (result, hits, misses, flashUntil) =>
+  pushDefenseRoundResult: (result) =>
+    set((s) => ({ defenseRoundResults: [...s.defenseRoundResults, result] })),
+  setDefenseFeedback: (feedback) => set({ defenseFeedback: feedback }),
+  endDefense: (result, flashUntil) =>
     set({
       defenseActive: false,
+      defenseIntro: null,
       defensePrompt: null,
-      defenseHits: hits,
-      defenseMisses: misses,
+      defenseFeedback: null,
       chaseResult: result,
       chaseResultFlashUntil: flashUntil,
     }),

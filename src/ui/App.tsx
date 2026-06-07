@@ -4,6 +4,7 @@ import gsap from "gsap";
 import "@fontsource/bangers";
 import "@fontsource/inter";
 import { useGameState } from "../state/gameState";
+import type { ArrowDir } from "../game/Input";
 import { ScoreSummary } from "./ScoreSummary";
 
 interface AppProps {
@@ -118,23 +119,118 @@ function StealthBar() {
   );
 }
 
-const ARROW_GLYPH: Record<string, string> = {
+const ARROW_GLYPH: Record<ArrowDir, string> = {
   up: "↑",
   down: "↓",
   left: "←",
   right: "→",
 };
 
+const QTE_CYAN = "#22d3ee";
+
+/** Screen-edge glow strip in the direction of the active arrow. */
+function EdgeGlow({ dir }: { dir: ArrowDir }) {
+  const c = "34,211,238"; // cyan rgb
+  const base: React.CSSProperties = { position: "absolute" };
+  let style: React.CSSProperties;
+  if (dir === "left") {
+    style = { ...base, left: 0, top: 0, bottom: 0, width: "16vw", background: `linear-gradient(90deg, rgba(${c},0.45), rgba(${c},0))` };
+  } else if (dir === "right") {
+    style = { ...base, right: 0, top: 0, bottom: 0, width: "16vw", background: `linear-gradient(270deg, rgba(${c},0.45), rgba(${c},0))` };
+  } else if (dir === "up") {
+    style = { ...base, top: 0, left: 0, right: 0, height: "16vh", background: `linear-gradient(180deg, rgba(${c},0.45), rgba(${c},0))` };
+  } else {
+    style = { ...base, bottom: 0, left: 0, right: 0, height: "16vh", background: `linear-gradient(0deg, rgba(${c},0.45), rgba(${c},0))` };
+  }
+  return <div style={style} className="animate-pulse" />;
+}
+
+/** The big arrow + shrinking timer ring. */
+function ArrowPrompt({
+  arrow,
+  windowMs,
+  deadline,
+  graceDeadline,
+}: {
+  arrow: ArrowDir;
+  windowMs: number;
+  deadline: number;
+  graceDeadline: number;
+}) {
+  const now = performance.now();
+  const remaining = deadline - now;
+  const frac = Math.max(0, Math.min(1, remaining / windowMs));
+  const inGrace = now > deadline && now <= graceDeadline;
+
+  const size = 220;
+  const r = size / 2 - 10;
+  const circumference = 2 * Math.PI * r;
+  // Full ring at window start, depletes to empty at the deadline.
+  const dashOffset = circumference * (1 - frac);
+  const ringColor = inGrace ? "#ff5566" : frac < 0.3 ? "#ffae42" : QTE_CYAN;
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        className={inGrace ? "animate-pulse" : ""}
+      >
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={8} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={ringColor}
+          strokeWidth={8}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </svg>
+      <div
+        key={`${arrow}-${deadline}`}
+        className="absolute inset-0 flex items-center justify-center qte-punch"
+        style={{ fontSize: 150, lineHeight: 1, color: QTE_CYAN, textShadow: `0 0 24px rgba(34,211,238,0.7)` }}
+      >
+        {ARROW_GLYPH[arrow]}
+      </div>
+    </div>
+  );
+}
+
+/** Green pulse (hit/late) or red shake (miss) on the just-pressed arrow. */
+function FeedbackArrow({ arrow, result }: { arrow: ArrowDir; result: "hit" | "late" | "miss" }) {
+  const color = result === "hit" ? "#62d99a" : result === "late" ? "#ffd166" : "#ff5566";
+  const glow = result === "miss" ? "255,85,102" : result === "late" ? "255,209,102" : "98,217,154";
+  const anim = result === "miss" ? "qte-shake" : "qte-pop";
+  return (
+    <div className="relative" style={{ width: 220, height: 220 }}>
+      <div
+        className={`absolute inset-0 flex items-center justify-center ${anim}`}
+        style={{ fontSize: 150, lineHeight: 1, color, textShadow: `0 0 28px rgba(${glow},0.85)` }}
+      >
+        {ARROW_GLYPH[arrow]}
+      </div>
+    </div>
+  );
+}
+
 function DefenseOverlay() {
   const active = useGameState((s) => s.defenseActive);
+  const intro = useGameState((s) => s.defenseIntro);
   const prompt = useGameState((s) => s.defensePrompt);
   const total = useGameState((s) => s.defenseTotalRounds);
-  const hits = useGameState((s) => s.defenseHits);
-  const misses = useGameState((s) => s.defenseMisses);
+  const results = useGameState((s) => s.defenseRoundResults);
+  const feedback = useGameState((s) => s.defenseFeedback);
   const [, setTick] = useState(0);
 
+  // Drive the shrinking ring; only needs to spin while an arrow is shown.
   useEffect(() => {
-    if (!active) return;
+    if (!prompt) return;
     let raf = 0;
     const loop = () => {
       setTick((n) => n + 1);
@@ -142,59 +238,70 @@ function DefenseOverlay() {
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [active]);
+  }, [prompt]);
 
   if (!active) return null;
 
-  let timerPct = 0;
-  if (prompt) {
-    const span = 700;
-    const remaining = prompt.deadline - performance.now();
-    timerPct = Math.max(0, Math.min(1, remaining / span));
-  }
+  const dotColor = (i: number) => {
+    const r = results[i];
+    if (!r) return "transparent";
+    return r === "hit" ? "#62d99a" : r === "late" ? "#ffd166" : "#ff5566";
+  };
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none">
-      <div className="font-display text-rose-100 text-2xl tracking-[0.35em] drop-shadow mb-4">
-        DEFEND
-      </div>
-      <div className="flex items-center gap-3 mb-3">
-        {Array.from({ length: total }).map((_, i) => {
-          const filled = i < hits + misses;
-          const ok = i < hits;
-          return (
+      {/* Layer 1: dark veil sells the frozen "moment". */}
+      <div className="absolute inset-0 bg-black/45" />
+
+      {prompt && <EdgeGlow dir={prompt.arrow} />}
+
+      <div className="relative flex flex-col items-center">
+        {/* DEFEND! banner */}
+        <div className="font-display text-rose-200 text-6xl md:text-7xl tracking-[0.2em] drop-shadow-lg title-glitch mb-2">
+          DEFEND!
+        </div>
+
+        {/* Layer 1 instructions — first encounter only. */}
+        {intro?.showInstructions && (
+          <div className="font-ui text-base md:text-lg text-white/85 tracking-wide mb-4">
+            Press the arrow keys as they appear
+          </div>
+        )}
+
+        {/* Round dots */}
+        <div className="flex items-center gap-3 mb-5">
+          {Array.from({ length: total }).map((_, i) => (
             <div
               key={i}
-              className="w-3 h-3 rounded-full border border-white/40"
-              style={{
-                background: filled ? (ok ? "#62d99a" : "#ff5566") : "transparent",
-              }}
+              className="w-3.5 h-3.5 rounded-full border border-white/40 transition-colors"
+              style={{ background: dotColor(i) }}
             />
-          );
-        })}
+          ))}
+        </div>
+
+        {/* Countdown / prompt / feedback */}
+        <div className="flex items-center justify-center" style={{ minHeight: 220 }}>
+          {intro && intro.countdown !== null && (
+            <div key={intro.countdown} className="font-display text-amber-100 qte-punch" style={{ fontSize: 160, lineHeight: 1, textShadow: "0 0 24px rgba(255,209,102,0.6)" }}>
+              {intro.countdown}
+            </div>
+          )}
+          {intro && intro.countdown === null && intro.showInstructions && (
+            <div className="font-display text-amber-200/80 tracking-[0.3em] text-3xl">READY…</div>
+          )}
+          {prompt && (
+            <ArrowPrompt
+              arrow={prompt.arrow}
+              windowMs={prompt.windowMs}
+              deadline={prompt.deadline}
+              graceDeadline={prompt.graceDeadline}
+            />
+          )}
+          {!prompt && !intro && feedback && (
+            <FeedbackArrow arrow={feedback.arrow} result={feedback.result} />
+          )}
+        </div>
       </div>
-      {prompt && (
-        <>
-          <div
-            className="text-[140px] leading-none font-display drop-shadow-lg"
-            style={{ color: "#ffd166", textShadow: "0 0 16px rgba(255,209,102,0.55)" }}
-          >
-            {ARROW_GLYPH[prompt.arrow]}
-          </div>
-          <div className="relative h-2 w-56 mt-3 bg-black/60 rounded-full overflow-hidden border border-white/20">
-            <div
-              className="absolute left-0 top-0 bottom-0"
-              style={{
-                width: `${timerPct * 100}%`,
-                background:
-                  timerPct < 0.3
-                    ? "linear-gradient(90deg, #ff5566, #ff8e6a)"
-                    : "linear-gradient(90deg, #ffd166, #ffae42)",
-              }}
-            />
-          </div>
-        </>
-      )}
     </div>
   );
 }

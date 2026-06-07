@@ -9,6 +9,7 @@ import type { Level } from "../levels/Level";
 import type { CollectedEvent } from "../levels/ScentSequence";
 import { Dinosaur } from "../entities/Dinosaur";
 import { PreyAnimal } from "../entities/PreyAnimal";
+import { Rival } from "../entities/Rival";
 import { TrackingSystem } from "../systems/TrackingSystem";
 import { ChaseSystem } from "../systems/ChaseSystem";
 import { StealthSystem } from "../systems/StealthSystem";
@@ -199,8 +200,9 @@ export class Game {
       runNameHint: "run",
     });
 
-    // Warm the GLB cache so the first chase doesn't pop in.
+    // Warm the GLB caches so the first chase / defense doesn't pop in.
     PreyAnimal.preload();
+    Rival.preload();
   }
 
   private onMissionFail() {
