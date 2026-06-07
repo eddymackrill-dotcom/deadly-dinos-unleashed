@@ -1,0 +1,44 @@
+# M4 — Roster: Progress Report
+
+Target tag: `v0.4-m4`
+Goal: a **playable 4-dino demo** — 4 dinosaurs, 4 biomes, mission select, per-dino
+saves. Not a perfect one. Blockers logged here; work proceeds with fallbacks.
+
+---
+
+## GLB verification (pre-flight)
+
+| Intended | File | Mesh | Animations | Verdict |
+|---|---|---|---|---|
+| Eoraptor | `player_eoraptor.glb` | Velociraptor | 6 (Idle, Run, Walk, Attack, Jump, Death) | ✅ used as-is |
+| Deinonychus | `player_deinonychus.glb` | `Cube.002` | **0** | ❌ broken placeholder |
+| T-Rex | `player_trex.glb` (copied from `rival_trex.glb`) | Trex | 6 | ✅ used as-is |
+| Spinosaurus | `player_spinosaurus.glb` | 596 submeshes, 4.8 MB | **0** | ⚠️ used with caveats |
+
+**Decisions (per the brief's fallback rule):**
+
+- **Deinonychus → Velociraptor fallback.** `player_deinonychus.glb` is a single
+  `Cube.002` mesh with no animations — a broken/placeholder export, unusable as a
+  distinct animated dinosaur. Per "fall back to Velociraptor for any broken
+  bipedal," its `modelPath` points at `/models/player_eoraptor.glb`. The
+  Deinonychus *identity* (stats, Sickle Strike power, jungle biome) is intact;
+  only the mesh is shared. Swapping in a real Deinonychus GLB later is a
+  one-line `modelPath` change. **Deferred: source a real Deinonychus mesh (M5).**
+
+- **Spinosaurus → real mesh, no animations, perf-watch.** `player_spinosaurus.glb`
+  is a valid but heavy model (596 submeshes / 4.8 MB, 0 animation tracks). Kept it
+  because the Spinosaurus silhouette is core to the River Ambush water-emergence
+  identity. The Dinosaur loader now synthesises a held-pose idle (root Y sine bob)
+  when a model has no animation clips (per CLAUDE.md's missing-idle guidance).
+  **Deferred / watch items (M5):**
+  - **Perf:** 596 meshes ≈ 596 draw calls + 4.8 MB download is a real risk on the
+    Chromebook-tier floor. Needs mesh-merge / decimation. If it collapses in
+    playtest, fall back to the T-Rex mesh (one-line `modelPath` change).
+  - **Animation:** no run/walk cycle — it slides while moving. Source an animated
+    Spinosaurus or rig the existing mesh in M5.
+
+---
+
+## Chunk log
+
+<!-- appended as each chunk lands -->
