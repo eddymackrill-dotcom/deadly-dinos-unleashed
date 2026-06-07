@@ -41,6 +41,8 @@ export class Dinosaur {
   private runWeight = 0;
 
   private model: THREE.Object3D | null = null;
+  private modelBaseY = 0; // ground-aligned model Y; base for the no-anim idle bob
+  private noAnimClock = 0;
   private modelBaseRotationY = Math.PI / 2;
   private facing: 1 | -1 = 1;
   private currentRotationY = Math.PI / 2;
@@ -128,6 +130,7 @@ export class Dinosaur {
     model.position.y -= scaledBox.min.y;
     model.rotation.y = this.modelBaseRotationY;
     this.currentRotationY = this.modelBaseRotationY;
+    this.modelBaseY = model.position.y;
 
     this.root.add(model);
     this.model = model;
@@ -264,7 +267,14 @@ export class Dinosaur {
 
     this.root.position.copy(this.position);
 
-    if (this.mixer) this.mixer.update(dt);
+    if (this.mixer) {
+      this.mixer.update(dt);
+    } else if (this.model) {
+      // No animation clips (e.g. the Spinosaurus placeholder) — synthesise a
+      // held-pose idle so the model isn't statue-still (CLAUDE.md guidance).
+      this.noAnimClock += dt;
+      this.model.position.y = this.modelBaseY + Math.sin(this.noAnimClock * 2) * 0.04;
+    }
   }
 
   private playTakeoffSquash() {

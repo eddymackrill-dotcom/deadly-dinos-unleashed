@@ -25,7 +25,13 @@ export interface ChaseCallbacks {
   onFOVReset: () => void;
   onGlitchSting: () => void;
   setPlayerInputLocked: (locked: boolean) => void;
+  /** Sickle Strike etc. — when active, contact range is generous (instant catch). */
+  isInstantCatchActive?: () => boolean;
 }
+
+// Catch range while an instant-catch power (Sickle Strike) is held — generous so
+// "touch the prey = catch" reads true.
+const INSTANT_CATCH_RADIUS = 3.0;
 
 type ChasePhase = "idle" | "running" | "resolving";
 
@@ -89,7 +95,8 @@ export class ChaseSystem {
     useGameState.getState().setChasePercent(this.timer / CHASE_DURATION_SECONDS);
 
     const dx = this.prey.position.x - playerPosition.x;
-    if (Math.abs(dx) <= CATCH_RADIUS) {
+    const catchRadius = this.cb.isInstantCatchActive?.() ? INSTANT_CATCH_RADIUS : CATCH_RADIUS;
+    if (Math.abs(dx) <= catchRadius) {
       this.beginResolve("win");
       return;
     }

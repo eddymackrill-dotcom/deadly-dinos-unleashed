@@ -112,3 +112,24 @@ body {
 .qte-shake {
   animation: qte-shake-kf 300ms ease-in-out;
 }
+
+/* Apex Roar shockwave — expanding ring pulse from screen centre. */
+@keyframes shockwave-kf {
+  from {
+    width: 12vmin;
+    height: 12vmin;
+    margin-left: -6vmin;
+    margin-top: -6vmin;
+    opacity: 0.6;
+  }
+  to {
+    width: 90vmin;
+    height: 90vmin;
+    margin-left: -45vmin;
+    margin-top: -45vmin;
+    opacity: 0;
+  }
+}
+.shockwave-ring {
+  animation: shockwave-kf 0.8s ease-out forwards;
+}

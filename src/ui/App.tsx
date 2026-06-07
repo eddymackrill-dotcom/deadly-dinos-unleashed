@@ -452,8 +452,15 @@ function PowerIcon() {
   );
 }
 
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.replace(/(.)/g, "$1$1") : h, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
 function PowerBurstTint() {
   const burstUntil = useGameState((s) => s.powerBurstUntil);
+  const tint = useGameState((s) => s.powerTint);
   const [now, setNow] = useState(() => performance.now());
 
   useEffect(() => {
@@ -470,12 +477,28 @@ function PowerBurstTint() {
   if (now >= burstUntil) return null;
   const remaining = burstUntil - now;
   const opacity = Math.min(1, remaining / 200) * 0.4;
+  const { r, g, b } = hexToRgb(tint);
   return (
     <div
       className="absolute inset-0 pointer-events-none"
       style={{
-        background: `radial-gradient(circle, rgba(255,60,80,${opacity}), rgba(0,0,0,0))`,
+        background: `radial-gradient(circle, rgba(${r},${g},${b},${opacity}), rgba(0,0,0,0))`,
       }}
+    />
+  );
+}
+
+/** Expanding ring pulse for Apex Roar (screen-space approximation). */
+function ShockwaveRing() {
+  const sw = useGameState((s) => s.powerShockwave);
+  const tint = useGameState((s) => s.powerTint);
+  if (!sw) return null;
+  const { r, g, b } = hexToRgb(tint);
+  return (
+    <div
+      key={sw.id}
+      className="absolute left-1/2 top-1/2 shockwave-ring pointer-events-none"
+      style={{ border: `6px solid rgba(${r},${g},${b},0.55)`, borderRadius: "50%" }}
     />
   );
 }
@@ -545,6 +568,7 @@ function HUD() {
       <DefenseOverlay />
       <RewardPopup />
       <PowerBurstTint />
+      <ShockwaveRing />
       <ChaseResultFlash />
     </>
   );

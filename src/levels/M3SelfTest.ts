@@ -6,6 +6,7 @@ import {
   defenseOutcomeFromResults,
 } from "../systems/DefenseSystem";
 import { PowerSystem } from "../systems/PowerSystem";
+import { DINOS } from "../data/dinosaurs";
 import { HiddenSecretsSystem, type SecretConfig } from "../systems/HiddenSecretsSystem";
 import { useGameState } from "../state/gameState";
 
@@ -162,8 +163,8 @@ function runPowerCooldownTest() {
 
   // Use an object so TS doesn't narrow the counter to a literal across asserts.
   const counters = { dashMult: 1, activations: 0 };
-  const power = new PowerSystem({
-    setDashSpeedMult: (m) => {
+  const power = new PowerSystem(DINOS.eoraptor.animalPower, {
+    setSpeedMult: (m) => {
       counters.dashMult = m;
     },
     onActivate: () => {

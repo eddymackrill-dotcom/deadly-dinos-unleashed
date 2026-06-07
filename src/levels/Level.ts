@@ -21,5 +21,10 @@ export interface Level {
    * sequence's active node).
    */
   setChevronTargetOverride(x: number | null): void;
+  /**
+   * Whether world-X falls on a water tile (River Ambush). Optional — levels
+   * without water omit it (treated as false). Implemented by the swamp level.
+   */
+  isWater?(x: number): boolean;
   dispose(): void;
 }

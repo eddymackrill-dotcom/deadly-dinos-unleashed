@@ -16,7 +16,7 @@ import { StealthSystem } from "../systems/StealthSystem";
 import { DefenseSystem } from "../systems/DefenseSystem";
 import { HiddenSecretsSystem } from "../systems/HiddenSecretsSystem";
 import { PowerSystem } from "../systems/PowerSystem";
-import { EORAPTOR, trackingDuration } from "../data/dinosaurs";
+import { EORAPTOR, trackingDuration, DINOS } from "../data/dinosaurs";
 import { useGameState } from "../state/gameState";
 import { commitMissionResult, getDinoSave, getMissionSave } from "../progression/Save";
 
@@ -74,8 +74,12 @@ export class Game {
   private secrets: HiddenSecretsSystem;
   private power: PowerSystem;
   private stealthSpeedMult = 1;
-  private dashSpeedMult = 1;
+  private powerSpeedMult = 1;
   private inputLocked = false;
+  // Power effect state (driven by the active dino's AnimalPower config).
+  private instantCatchActive = false; // Sickle Strike: contact = catch
+  private shockwaveTimer = 0; // Apex Roar: pulse cadence
+  private shownNeedsWater = false; // River Ambush: first-time tooltip guard
   readonly fx: GameFX;
   private rafId: number | null = null;
   private running = false;
@@ -129,6 +133,7 @@ export class Game {
       setPlayerInputLocked: (locked) => {
         this.inputLocked = locked;
       },
+      isInstantCatchActive: () => this.instantCatchActive,
     });
     this.chase.onResolved = (outcome) => {
       const ev = this.level.sequence.resolveEncounter(outcome);
@@ -173,12 +178,58 @@ export class Game {
       missionSave.foundSecretIds ?? [],
     );
 
-    this.power = new PowerSystem({
-      setDashSpeedMult: (m) => {
-        this.dashSpeedMult = m;
+    // Active dino's animal power (Eoraptor until Mission Select lands in chunk 5).
+    const power = DINOS.eoraptor.animalPower;
+    this.power = new PowerSystem(power, {
+      setSpeedMult: (m) => {
+        this.powerSpeedMult = m;
         this.applySpeedMultiplier();
       },
-      onActivate: () => this.fx.dashBurst(),
+      onActivate: () => {
+        this.fx.dashBurst();
+        this.shockwaveTimer = 0;
+        this.instantCatchActive = !!power.instantCatch;
+        if (power.transparentWhileActive) {
+          // River Ambush: vanish beneath the surface.
+          this.player.setTint(new THREE.Color(power.tintColor ?? "#3fb6ff"), 0.4, 0.3);
+        } else if (power.trail) {
+          // Sickle Strike: glowing surge (full after-image trail deferred — M5).
+          this.player.setTint(new THREE.Color(power.tintColor ?? "#ffd24a"), 0.4, 1);
+        }
+      },
+      onDeactivate: () => {
+        this.instantCatchActive = false;
+        this.shockwaveTimer = 0;
+        this.player.setTint(null, 0, 1);
+      },
+      onActiveTick: (dt) => {
+        if (power.shockwave) {
+          // Apex Roar: emit an expanding shockwave on a fixed cadence.
+          this.shockwaveTimer += dt;
+          if (this.shockwaveTimer >= power.shockwave.intervalSeconds) {
+            this.shockwaveTimer -= power.shockwave.intervalSeconds;
+            useGameState.getState().pushShockwave();
+            this.camera.shake(0.1, 0.12);
+          }
+        }
+      },
+      canActivate: power.requiresWater ? () => this.isPlayerInWater() : undefined,
+      onActivateRejected: power.requiresWater
+        ? () => {
+            if (!this.shownNeedsWater) {
+              this.shownNeedsWater = true;
+              useGameState.getState().pushRewardPopup("NEEDS WATER");
+            }
+          }
+        : undefined,
+      onRelease: power.teleportOnRelease
+        ? () => {
+            // River Ambush: surface at the next trail point if released in water.
+            if (!this.isPlayerInWater()) return;
+            const next = this.level.sequence.getActive();
+            if (next) this.player.position.x = next.position.x;
+          }
+        : undefined,
     });
 
     this.defense.onResolved = (outcome) => {
@@ -211,7 +262,12 @@ export class Game {
   }
 
   private applySpeedMultiplier() {
-    this.player.setSpeedMultiplier(this.stealthSpeedMult * this.dashSpeedMult);
+    this.player.setSpeedMultiplier(this.stealthSpeedMult * this.powerSpeedMult);
+  }
+
+  /** True if the active dino is standing on a level water tile (River Ambush). */
+  private isPlayerInWater(): boolean {
+    return this.level.isWater?.(this.player.position.x) ?? false;
   }
 
   private commitMissionToSave() {

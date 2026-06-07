@@ -41,4 +41,30 @@ saves. Not a perfect one. Blockers logged here; work proceeds with fallbacks.
 
 ## Chunk log
 
-<!-- appended as each chunk lands -->
+### Chunk 1 — dinosaur data model ✅
+`src/data/dinosaurs.ts` is the single source of truth (`DinoDef` per dino, hold-to-
+activate `AnimalPower` config, stats from CLAUDE.md). 4 dinos shipped; other 4
+commented. Legacy `EORAPTOR`/`trackingDuration` shims retained for Game.ts.
+
+### Chunk 2 — per-dino animal powers ✅
+`PowerSystem` generalised to be config-driven from `AnimalPower` with effect hooks
+(`setSpeedMult`, `onActivate/Deactivate`, `canActivate`, `onActivateRejected`,
+`onActiveTick`, `onRelease`). All four powers built and HUD-registered; the M3
+input audit (works in chase, breaks stealth, locked in defense) applies to all via
+the shared Game gate. Per-power tint + Apex-Roar shockwave ring + NEEDS WATER
+tooltip added to the HUD. Sickle Strike boosts chase catch radius (instant catch);
+River Ambush gated on `Level.isWater()` + teleports to the next node on release.
+
+**Deferred / deviations (chunk 2):**
+- **Rival combat effects have no targets yet.** Apex Roar's rival push-back/stun
+  and Sickle Strike's rival stun only matter against free-roam rivals — but rivals
+  currently exist only inside the defense QTE, where powers are locked. The roar
+  ships as shockwave-ring + screen-shake + tint (visual); the knock-back lands when
+  free-roam rivals exist (M5+). Logged, not a blocker.
+- **Sickle after-image trail** is approximated by a yellow surge tint; a true
+  sickle-shaped after-image is deferred to the M6 particle pass.
+- **River Ambush** is only exercisable once chunk 4 adds water tiles to the swamp
+  level; until then X reports "NEEDS WATER". Shockwave ring is a screen-space
+  approximation (centred), not world-anchored to the player.
+- Only Eoraptor is reachable in-game until Mission Select (chunk 5); the other
+  powers are verified by build + the chunk-7 self-test until then.

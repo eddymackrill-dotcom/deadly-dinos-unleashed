@@ -1,29 +1,40 @@
 import { useGameState } from "../state/gameState";
+import type { AnimalPower } from "../data/dinosaurs";
 
-const DASH_SPEED_MULT = 1.6; // +60% move speed (DESIGN.md §7)
-const MAX_HOLD_S = 3; // hold cap — past this the dash is force-released.
-const COOLDOWN_HOLD_FACTOR = 1.5; // cooldown = 1.5 × time held.
-const MAX_HOLD_COOLDOWN_S = 8; // full penalty cooldown when the cap is hit.
 const BURST_DURATION_MS = 200;
 
 type Phase = "ready" | "active" | "cooldown";
 
-export interface PowerCallbacks {
-  setDashSpeedMult: (m: number) => void;
+/**
+ * Effect hooks wired by Game. The PowerSystem owns the hold/cooldown state
+ * machine (identical across the roster); the hooks apply each dino's distinct
+ * effect. All are optional except the speed channel and the activation FX.
+ */
+export interface PowerHooks {
+  /** Apply the power's move-speed multiplier (1 = none). */
+  setSpeedMult: (m: number) => void;
+  /** Activation FX (chromatic burst / tint). */
   onActivate: () => void;
+  /** Cleanup when the effect ends (release or hold-cap). */
+  onDeactivate?: () => void;
+  /** Gate — return false to block activation (e.g. River Ambush needs water). */
+  canActivate?: () => boolean;
+  /** Called when canActivate() blocked the press (e.g. NEEDS WATER tooltip). */
+  onActivateRejected?: () => void;
+  /** Per-frame while active — shockwave timing, contact checks, transparency. */
+  onActiveTick?: (dt: number, heldSeconds: number) => void;
+  /** Called on release while active (before cooldown) — e.g. ambush teleport. */
+  onRelease?: (heldSeconds: number) => void;
 }
 
 /**
- * Eoraptor's animal power: Quick Dash (+60% speed), HOLD-TO-ACTIVATE.
+ * Generic HOLD-TO-ACTIVATE animal power (DESIGN.md §7), config-driven from the
+ * dino's `AnimalPower`. The boost lasts while X is held, up to
+ * `maxHoldSeconds`; releasing starts a cooldown of `cooldownHoldFactor × held`;
+ * hitting the cap force-releases into the full `cooldownSeconds` penalty.
  *
- * This deviates from the original "tap once, fixed 3s timer" spec (DESIGN.md
- * §7, updated): the boost lasts only while X is held. Releasing starts a
- * cooldown of 1.5× the time held (brief hold → short cooldown, discouraging
- * spam). Holding for the full MAX_HOLD_S force-releases and incurs the full
- * MAX_HOLD_COOLDOWN_S penalty, so you can't just pin X down.
- *
- * Phase progression: ready → press X → active (while held, ≤3s) → release/cap
- * → cooldown → ready. Stats publish to gameState each frame for the HUD radial.
+ * Phase: ready → press X → active (while held) → release/cap → cooldown → ready.
+ * Stats publish to gameState each frame for the HUD radial.
  */
 export class PowerSystem {
   private phase: Phase = "ready";
@@ -31,7 +42,10 @@ export class PowerSystem {
   private cooldownTimeLeft = 0;
   private cooldownDuration = 0;
 
-  constructor(private cb: PowerCallbacks) {
+  constructor(
+    private power: AnimalPower,
+    private hooks: PowerHooks,
+  ) {
     useGameState.getState().setPowerState({
       ready: true,
       active: false,
@@ -43,30 +57,37 @@ export class PowerSystem {
     return this.phase === "active";
   }
 
-  /** Call on a fresh X press. Starts the dash if ready. Returns true if it did. */
+  /** Call on a fresh X press. Starts the power if ready and the gate allows. */
   tryActivate(): boolean {
     if (this.phase !== "ready") return false;
+    if (this.hooks.canActivate && !this.hooks.canActivate()) {
+      this.hooks.onActivateRejected?.();
+      return false;
+    }
     this.phase = "active";
     this.heldTime = 0;
-    this.cb.setDashSpeedMult(DASH_SPEED_MULT);
-    this.cb.onActivate();
+    this.hooks.setSpeedMult(this.power.speedMultiplier);
+    this.hooks.onActivate();
     useGameState.getState().setPowerState({
       ready: false,
       active: true,
       cooldownPercent: 1,
       burstUntil: performance.now() + BURST_DURATION_MS,
+      tintColor: this.power.tintColor,
     });
     return true;
   }
 
-  /** Call when X is released. Ends the dash and starts a hold-scaled cooldown. */
+  /** Call when X is released. Ends the effect and starts a hold-scaled cooldown. */
   release() {
     if (this.phase !== "active") return;
-    this.beginCooldown(this.heldTime * COOLDOWN_HOLD_FACTOR);
+    this.hooks.onRelease?.(this.heldTime);
+    this.beginCooldown(this.heldTime * this.power.cooldownHoldFactor);
   }
 
   private beginCooldown(duration: number) {
-    this.cb.setDashSpeedMult(1);
+    this.hooks.setSpeedMult(1);
+    this.hooks.onDeactivate?.();
     this.cooldownDuration = duration;
     this.cooldownTimeLeft = duration;
     if (duration <= 0) {
@@ -90,9 +111,10 @@ export class PowerSystem {
   update(dt: number) {
     if (this.phase === "active") {
       this.heldTime += dt;
-      if (this.heldTime >= MAX_HOLD_S) {
+      this.hooks.onActiveTick?.(dt, this.heldTime);
+      if (this.heldTime >= this.power.maxHoldSeconds) {
         // Held to the cap — force off and take the full penalty cooldown.
-        this.beginCooldown(MAX_HOLD_COOLDOWN_S);
+        this.beginCooldown(this.power.cooldownSeconds);
       }
       return;
     }

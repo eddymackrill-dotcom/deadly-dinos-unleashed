@@ -100,6 +100,9 @@ export interface MissionState {
   powerActive: boolean;
   powerCooldownPercent: number; // 1.0 = just fired, 0 = ready
   powerBurstUntil: number;
+  powerTint: string; // hex screen-tint colour for the active power's burst
+  /** Bumped each time an Apex-Roar shockwave pulse fires (HUD ring). */
+  powerShockwave: { id: number; at: number } | null;
 
   setTrackingPercent: (v: number) => void;
   setScentProgress: (collected: number, total: number) => void;
@@ -133,7 +136,9 @@ export interface MissionState {
     active: boolean;
     cooldownPercent: number;
     burstUntil?: number;
+    tintColor?: string;
   }) => void;
+  pushShockwave: () => void;
   /** Replace the entire results array from the sequence. */
   setScentResults: (results: NodeResult[]) => void;
   setPersistedTotals: (info: {
@@ -172,6 +177,7 @@ const initial: Omit<
   | "addSecretPoints"
   | "pushRewardPopup"
   | "setPowerState"
+  | "pushShockwave"
   | "setScentResults"
   | "setPersistedTotals"
   | "setNewBests"
@@ -221,6 +227,8 @@ const initial: Omit<
   powerActive: false,
   powerCooldownPercent: 0,
   powerBurstUntil: 0,
+  powerTint: "#ff3a3a",
+  powerShockwave: null,
 };
 
 export const useGameState = create<MissionState>((set) => ({
@@ -304,7 +312,10 @@ export const useGameState = create<MissionState>((set) => ({
       powerActive: info.active,
       powerCooldownPercent: Math.max(0, Math.min(1, info.cooldownPercent)),
       powerBurstUntil: info.burstUntil ?? s.powerBurstUntil,
+      powerTint: info.tintColor ?? s.powerTint,
     })),
+  pushShockwave: () =>
+    set({ powerShockwave: { id: rewardPopupCounter++, at: performance.now() } }),
   setScentResults: (results) => {
     const points = results.reduce((s, r) => s + r.points, 0);
     set({ scentResults: results.map((r) => ({ ...r })), predatorPointsEarned: points });
