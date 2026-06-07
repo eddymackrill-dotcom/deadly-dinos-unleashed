@@ -169,50 +169,62 @@ function runPowerCooldownTest() {
     onActivate: () => {
       counters.activations += 1;
     },
-    powerStat: 2, // matches Eoraptor → cooldown ≈ 7.2s
   });
 
   // Initially ready.
-  const dbg0 = power.getDebugState();
-  assert(dbg0.phase === "ready", `${tag}: initial phase=ready (got ${dbg0.phase})`);
+  assert(power.getDebugState().phase === "ready", `${tag}: initial phase=ready`);
 
-  // First activation succeeds.
-  const ok1 = power.tryActivate();
-  assert(ok1, `${tag}: first tryActivate should succeed`);
+  // --- Hold then release: cooldown = 1.5 × time held ---
+  assert(power.tryActivate(), `${tag}: first tryActivate should succeed`);
   assert((counters.activations as number) === 1, `${tag}: onActivate fired once`);
-  assert(counters.dashMult > 1, `${tag}: dash mult should be > 1 during active (got ${counters.dashMult})`);
+  assert(counters.dashMult > 1, `${tag}: dash mult > 1 while held (got ${counters.dashMult})`);
+  // Re-press while active is rejected.
+  assert(!power.tryActivate(), `${tag}: tryActivate while active should fail`);
 
-  // Second activation while active is rejected.
-  const ok2 = power.tryActivate();
-  assert(!ok2, `${tag}: tryActivate during active should fail`);
-  assert((counters.activations as number) === 1, `${tag}: still one activation`);
-
-  // Step 3s — effect ends, cooldown starts.
-  for (let i = 0; i < 30; i++) power.update(0.1);
+  // Hold for 1.0s (still under the 3s cap) — stays active.
+  for (let i = 0; i < 10; i++) power.update(0.1);
   let dbg = power.getDebugState();
-  assert(dbg.phase === "cooldown", `${tag}: phase=cooldown after 3s (got ${dbg.phase})`);
-  assert(counters.dashMult === 1, `${tag}: dash mult back to 1 after effect (got ${counters.dashMult})`);
-  // Cooldown remaining should be ~full at this moment.
-  assert(
-    dbg.cooldownTimeLeft > dbg.cooldownDuration * 0.95,
-    `${tag}: cooldown just started — remaining (${dbg.cooldownTimeLeft.toFixed(2)}) should be ≈ duration (${dbg.cooldownDuration.toFixed(2)})`,
-  );
+  assert(dbg.phase === "active", `${tag}: still active after 1s held (got ${dbg.phase})`);
+  assert(counters.dashMult > 1, `${tag}: dash mult still boosted while held`);
 
-  // Activation during cooldown rejected.
+  // Release — cooldown should be ≈ 1.5 × 1.0s = 1.5s.
+  power.release();
+  dbg = power.getDebugState();
+  assert(dbg.phase === "cooldown", `${tag}: phase=cooldown after release (got ${dbg.phase})`);
+  assert(counters.dashMult === 1, `${tag}: dash mult back to 1 after release`);
+  assert(
+    Math.abs(dbg.cooldownDuration - 1.5) < 0.05,
+    `${tag}: cooldown should be ≈1.5s for a 1.0s hold (got ${dbg.cooldownDuration.toFixed(2)})`,
+  );
   assert(!power.tryActivate(), `${tag}: tryActivate during cooldown should fail`);
 
-  // Step the full cooldown duration → ready again.
-  const cooldown = dbg.cooldownDuration;
-  for (let i = 0; i < Math.ceil(cooldown * 10) + 1; i++) power.update(0.1);
-  dbg = power.getDebugState();
-  assert(dbg.phase === "ready", `${tag}: phase=ready after cooldown (got ${dbg.phase})`);
+  // Run out the cooldown → ready.
+  for (let i = 0; i < 16; i++) power.update(0.1);
+  assert(power.getDebugState().phase === "ready", `${tag}: ready after cooldown elapses`);
+  console.log(`${tag} hold 1s → release → cooldown 1.5s → ready — OK`);
 
-  // Now reactivation works.
+  // --- Max-hold cap: holding ≥3s force-releases into the full 8s penalty ---
   assert(power.tryActivate(), `${tag}: re-activate after cooldown should succeed`);
-  assert((counters.activations as number) === 2, `${tag}: two activations total`);
-  console.log(
-    `${tag} ready → active(3s) → cooldown(${cooldown.toFixed(1)}s) → ready, gate intact — OK`,
+  for (let i = 0; i < 31; i++) power.update(0.1); // 3.1s held
+  dbg = power.getDebugState();
+  assert(dbg.phase === "cooldown", `${tag}: 3s cap force-releases to cooldown (got ${dbg.phase})`);
+  assert(counters.dashMult === 1, `${tag}: dash mult off after cap`);
+  assert(
+    Math.abs(dbg.cooldownDuration - 8) < 0.0001,
+    `${tag}: max-hold penalty cooldown should be 8s (got ${dbg.cooldownDuration})`,
   );
+  console.log(`${tag} hold to 3s cap → forced off → full 8s cooldown — OK`);
+
+  // --- Tap: press + immediate release (no update) ⇒ ~0 cooldown, ready at once ---
+  for (let i = 0; i < 81; i++) power.update(0.1); // clear the 8s cooldown
+  assert(power.getDebugState().phase === "ready", `${tag}: ready after 8s cooldown`);
+  assert(power.tryActivate(), `${tag}: tap activate should succeed`);
+  power.release(); // released same frame, heldTime ≈ 0
+  assert(
+    power.getDebugState().phase === "ready",
+    `${tag}: a same-frame tap leaves no cooldown (got ${power.getDebugState().phase})`,
+  );
+  console.log(`${tag} instant tap → negligible cooldown → ready — OK`);
 
   useGameState.getState().reset();
 }

@@ -15,7 +15,9 @@ const NODE_CONFIGS: ScentNodeConfig[] = [
   { position: new THREE.Vector3(95, 0.4, 0), type: "collect", points: 100 },
 ];
 
-const LEDGE_X = 85;
+// Sits between defense@80 and collect@95. Kept clear of the defense node so
+// the rival T-Rex (spawns ~x=83.4) doesn't visually overlap the ledge box.
+const LEDGE_X = 90;
 const LEDGE_Y = 1.0;
 const LEDGE_HALF_WIDTH = 1.6;
 
@@ -26,7 +28,8 @@ const SECRET_CONFIGS: SecretConfig[] = [
     position: new THREE.Vector3(37, 0.4, 0),
     pointsRange: [100, 300],
   },
-  // Hard: atop the raised ledge near defense@80, requires a jump.
+  // Hard: atop the raised ledge after defense@80, requires a jump. (Id keeps
+  // its original suffix so existing save progress isn't orphaned.)
   {
     id: "l1_secret_ledge_85",
     position: new THREE.Vector3(LEDGE_X, LEDGE_Y + 0.35, 0),

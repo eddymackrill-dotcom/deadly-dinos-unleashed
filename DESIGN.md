@@ -113,15 +113,30 @@ Detailed specs for each gameplay system. Companion to CLAUDE.md.
 
 ## 7. Animal Power (X key)
 
-**Activation:** Press X. No hold required. Triggers a timed effect specific to the dinosaur.
+**Activation:** Press X. Most powers trigger a timed/instant effect; some are
+**hold-to-activate** (see the Duration column). The defense QTE is the only
+state that locks the power — it remains available during chase, stealth, and
+free roam.
 
-**Cooldown:** 8 seconds default, scales with `powerStat`.
+**Cooldown:** 8 seconds default for fixed-duration powers, scales with
+`powerStat`. **Hold-to-activate** powers instead cool down for **1.5× the time
+the key was held**, capped: holding to the maximum duration force-releases the
+power and incurs the full 8s cooldown (so the key can't simply be pinned down).
+
+**Eoraptor — Quick Dash (hold-to-activate, canonical):**
+- +60% move speed *only while X is held*.
+- Releasing X ends the boost and starts a cooldown of 1.5× the time held
+  (a brief tap → negligible cooldown; a long hold → long cooldown).
+- Maximum continuous hold is **3s** — at the cap the dash force-releases and a
+  full **8s** cooldown applies regardless of whether X is still down.
+- HUD: radial shows "ACTIVE · HOLD" while held, then a depleting cooldown fill,
+  then a ready pulse.
 
 **Per-dino effects:**
 
 | Dino | Effect | Duration |
 |---|---|---|
-| Eoraptor | +60% move speed | 3s |
+| Eoraptor | +60% move speed | hold (≤3s) |
 | Herrerasaurus | Next jump 2× distance | until jump |
 | Deinonychus | Sickle strike: break breakable obstacles, stun rivals | instant |
 | Tarbosaurus | Bone crush: stun rival for 2× normal | 2s |

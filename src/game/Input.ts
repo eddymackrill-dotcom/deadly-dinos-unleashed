@@ -64,6 +64,11 @@ export class Input {
     return this._powerPressedAt;
   }
 
+  /** Whether the power key (X) is currently held down — drives hold-to-dash. */
+  get powerHeld(): boolean {
+    return this.keysDown.has("KeyX");
+  }
+
   consumePowerPress() {
     this._powerPressedAt = -Infinity;
   }

@@ -179,7 +179,6 @@ export class Game {
         this.applySpeedMultiplier();
       },
       onActivate: () => this.fx.dashBurst(),
-      powerStat: EORAPTOR.stats.power,
     });
 
     this.defense.onResolved = (outcome) => {
@@ -275,6 +274,7 @@ export class Game {
     // Quick Dash (X) is a FREE-MOVEMENT power — decoupled from `inputLocked` so
     // a chase (or its win-resolve freeze) can never swallow it. The defense QTE
     // is the only state that locks non-arrow input, so it's the only gate here.
+    // Hold-to-activate: a fresh press starts it while ready; releasing X ends it.
     if (!this.defense.isActive) {
       const powerAgeMs = performance.now() - this.input.powerPressedAt();
       if (powerAgeMs <= JUMP_BUFFER_MS && this.power.tryActivate()) {
@@ -285,6 +285,8 @@ export class Game {
           this.stealth.spook();
         }
       }
+      // Release the dash the moment X comes up (no-op unless currently active).
+      if (!this.input.powerHeld) this.power.release();
     }
 
     this.power.update(dt);

@@ -366,9 +366,11 @@ function PowerIcon() {
 
   const ring = active ? "#ff5566" : ready ? "#62d99a" : "#ffd166";
   const fill = active ? "rgba(255,80,100,0.18)" : "rgba(0,0,0,0.55)";
+  // While held the ring is full (the dash drains nothing); cooldown depletes it.
+  const ringOffset = active ? 0 : dashOffset;
 
   return (
-    <div className="absolute top-14 right-4 pointer-events-none select-none">
+    <div className="absolute top-14 right-4 pointer-events-none select-none flex flex-col items-center gap-1">
       <div
         className={`relative ${ready ? "power-pulse" : ""}`}
         style={{ width: size, height: size }}
@@ -383,7 +385,7 @@ function PowerIcon() {
             stroke={ring}
             strokeWidth={3.5}
             strokeDasharray={circumference}
-            strokeDashoffset={dashOffset}
+            strokeDashoffset={ringOffset}
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
             style={{ transition: "stroke-dashoffset 80ms linear" }}
           />
@@ -399,6 +401,12 @@ function PowerIcon() {
             X
           </text>
         </svg>
+      </div>
+      <div
+        className="font-display tracking-widest text-[10px] leading-none"
+        style={{ color: active ? "#ff8e9e" : ready ? "#9ff0c0" : "#ffd166" }}
+      >
+        {active ? "ACTIVE · HOLD" : ready ? "DASH" : "COOLDOWN"}
       </div>
     </div>
   );
