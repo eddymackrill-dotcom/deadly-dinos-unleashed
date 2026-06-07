@@ -68,3 +68,19 @@ River Ambush gated on `Level.isWater()` + teleports to the next node on release.
   approximation (centred), not world-anchored to the player.
 - Only Eoraptor is reachable in-game until Mission Select (chunk 5); the other
   powers are verified by build + the chunk-7 self-test until then.
+
+### Chunk 3 — biome system ✅
+`src/data/biomes.ts` (4 `BiomeConfig`s: triassic, jungle, plains, swamp) +
+`src/levels/biomeMeshes.ts` (shared procedural generators incl. new `trees` /
+`swamp_trees`) + `src/levels/Biome.ts` (`buildBiomeWorld` → ground, water tiles,
+scattered props, parallax, `isWater`). `Scene.applyBiome()` sets the sky-gradient
+CanvasTexture, fog, and ambient light. L1 refactored to build its world from the
+Triassic config; Game calls `applyBiome`.
+
+**Deferred / deviations (chunk 3):**
+- Water "ripple" is a cheap opacity pulse, not a shader (perf floor). Swamp water
+  tile x-ranges live in the biome config and the chunk-4 Spinosaurus level is
+  designed around them.
+- Sky gradient is a screen-space CanvasTexture background (cheap), not a domed sky.
+- Ground-prop colours are derived from each biome's parallax palette (brightened),
+  keeping the brief's `ground.propMeshes: string[]` schema intact.

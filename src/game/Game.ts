@@ -17,6 +17,7 @@ import { DefenseSystem } from "../systems/DefenseSystem";
 import { HiddenSecretsSystem } from "../systems/HiddenSecretsSystem";
 import { PowerSystem } from "../systems/PowerSystem";
 import { EORAPTOR, trackingDuration, DINOS } from "../data/dinosaurs";
+import { getBiome } from "../data/biomes";
 import { useGameState } from "../state/gameState";
 import { commitMissionResult, getDinoSave, getMissionSave } from "../progression/Save";
 
@@ -92,6 +93,7 @@ export class Game {
 
     this.level = createLevel1();
     this.scene.scene.add(this.level.root);
+    this.scene.applyBiome(getBiome(DINOS.eoraptor.biomeId));
 
     this.player = new Dinosaur();
     this.scene.scene.add(this.player.root);
