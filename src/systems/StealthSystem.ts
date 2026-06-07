@@ -145,6 +145,16 @@ export class StealthSystem {
     }
   }
 
+  /**
+   * Externally-triggered loss — e.g. activating Quick Dash blows your cover and
+   * the prey bolts. No-op outside the running phase.
+   */
+  spook() {
+    if (this.phase !== "running") return;
+    this.prey?.setRunSpeed(this.playerFacing * 6);
+    this.beginResolve("lose");
+  }
+
   private beginResolve(result: "win" | "lose") {
     this.phase = "resolving";
     this.pendingResult = result;

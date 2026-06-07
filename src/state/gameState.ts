@@ -72,6 +72,8 @@ export interface MissionState {
   chasePercent: number;
   chaseResult: ChaseOutcome | null;
   chaseResultFlashUntil: number;
+  /** Overrides the derived result-flash label (e.g. "STEALTH BROKEN"). */
+  chaseResultLabel: string | null;
 
   stealthActive: boolean;
   stealthPercent: number;
@@ -108,6 +110,7 @@ export interface MissionState {
   startChase: () => void;
   setChasePercent: (v: number) => void;
   endChase: (result: ChaseOutcome, flashUntil: number) => void;
+  setResultLabelOverride: (label: string | null) => void;
   startStealth: () => void;
   setStealthState: (percent: number, inBush: boolean) => void;
   endStealth: (result: ChaseOutcome, flashUntil: number) => void;
@@ -150,6 +153,7 @@ const initial: Omit<
   | "startChase"
   | "setChasePercent"
   | "endChase"
+  | "setResultLabelOverride"
   | "startStealth"
   | "setStealthState"
   | "endStealth"
@@ -189,6 +193,7 @@ const initial: Omit<
   chasePercent: 1,
   chaseResult: null,
   chaseResultFlashUntil: 0,
+  chaseResultLabel: null,
 
   stealthActive: false,
   stealthPercent: 1,
@@ -226,12 +231,20 @@ export const useGameState = create<MissionState>((set) => ({
       dinoStats: info.stats,
       rank: info.rank,
     }),
-  startChase: () => set({ chaseActive: true, chasePercent: 1, chaseResult: null }),
+  startChase: () =>
+    set({ chaseActive: true, chasePercent: 1, chaseResult: null, chaseResultLabel: null }),
   setChasePercent: (v) => set({ chasePercent: Math.max(0, Math.min(1, v)) }),
   endChase: (result, flashUntil) =>
     set({ chaseActive: false, chaseResult: result, chaseResultFlashUntil: flashUntil }),
+  setResultLabelOverride: (label) => set({ chaseResultLabel: label }),
   startStealth: () =>
-    set({ stealthActive: true, stealthPercent: 1, stealthInBush: false, chaseResult: null }),
+    set({
+      stealthActive: true,
+      stealthPercent: 1,
+      stealthInBush: false,
+      chaseResult: null,
+      chaseResultLabel: null,
+    }),
   setStealthState: (percent, inBush) =>
     set({ stealthPercent: Math.max(0, Math.min(1, percent)), stealthInBush: inBush }),
   endStealth: (result, flashUntil) =>
@@ -250,6 +263,7 @@ export const useGameState = create<MissionState>((set) => ({
       defenseRoundResults: [],
       defenseFeedback: null,
       chaseResult: null,
+      chaseResultLabel: null,
     }),
   setDefenseIntro: (intro) => set({ defenseIntro: intro }),
   setDefensePrompt: (prompt) => set({ defensePrompt: prompt }),

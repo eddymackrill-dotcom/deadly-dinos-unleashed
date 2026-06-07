@@ -309,6 +309,7 @@ function DefenseOverlay() {
 function ChaseResultFlash() {
   const result = useGameState((s) => s.chaseResult);
   const flashUntil = useGameState((s) => s.chaseResultFlashUntil);
+  const labelOverride = useGameState((s) => s.chaseResultLabel);
   const [now, setNow] = useState(() => performance.now());
 
   useEffect(() => {
@@ -334,6 +335,12 @@ function ChaseResultFlash() {
     label = "HELD GROUND";
     tint = "text-amber-100";
     bg = "radial-gradient(circle, rgba(255,220,120,0.18), rgba(0,0,0,0.5))";
+  }
+  // An explicit override (e.g. dash blowing your cover) wins, with an alarm tint.
+  if (labelOverride) {
+    label = labelOverride;
+    tint = "text-rose-200";
+    bg = "radial-gradient(circle, rgba(255,90,110,0.22), rgba(0,0,0,0.55))";
   }
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none">

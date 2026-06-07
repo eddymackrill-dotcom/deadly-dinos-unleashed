@@ -261,6 +261,8 @@ export class Game {
 
     this.player.setMoveInput(this.inputLocked ? 0 : this.input.dir);
 
+    // Movement + jump follow the movement lock (chase/stealth win-resolve
+    // freeze, and the defense QTE).
     if (!this.inputLocked) {
       const jumpAgeMs = performance.now() - this.input.jumpPressedAt();
       if (jumpAgeMs <= JUMP_BUFFER_MS && this.player.canJumpNow()) {
@@ -268,10 +270,19 @@ export class Game {
           this.input.consumeJumpPress();
         }
       }
+    }
+
+    // Quick Dash (X) is a FREE-MOVEMENT power — decoupled from `inputLocked` so
+    // a chase (or its win-resolve freeze) can never swallow it. The defense QTE
+    // is the only state that locks non-arrow input, so it's the only gate here.
+    if (!this.defense.isActive) {
       const powerAgeMs = performance.now() - this.input.powerPressedAt();
-      if (powerAgeMs <= JUMP_BUFFER_MS) {
-        if (this.power.tryActivate()) {
-          this.input.consumePowerPress();
+      if (powerAgeMs <= JUMP_BUFFER_MS && this.power.tryActivate()) {
+        this.input.consumePowerPress();
+        // Sprinting in cover blows your cover: the prey spots you and bolts.
+        if (this.stealth.isActive) {
+          useGameState.getState().setResultLabelOverride("STEALTH BROKEN");
+          this.stealth.spook();
         }
       }
     }
