@@ -109,6 +109,9 @@ export class Game {
     this.postProcess = new PostProcess(this.scene.renderer, this.scene.scene, this.camera.camera);
     this.fx = new GameFX(this.postProcess.glitchIntensity);
 
+    const dinoSave = getDinoSave(dino.id);
+    const missionSave = getMissionSave(dino.id, this.missionId);
+
     const state = useGameState.getState();
     state.reset();
     state.setDino({
@@ -117,12 +120,10 @@ export class Game {
       era: dino.era,
       region: dino.region,
       stats: dino.stats,
-      rank: 1,
+      rank: dinoSave.rank,
     });
     state.setScentProgress(0, this.level.sequence.total);
 
-    const dinoSave = getDinoSave(dino.id);
-    const missionSave = getMissionSave(dino.id, this.missionId);
     state.setPersistedTotals({
       totalPredatorPoints: dinoSave.predatorPoints,
       bestMissionCompletion: missionSave.completion,

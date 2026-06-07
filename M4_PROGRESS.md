@@ -124,3 +124,17 @@ card (driven by gameState) replays on each launch.
   the perf floor.
 - Each mission swaps in a fresh `<canvas>` (a WebGL canvas only yields one
   context, so the element can't be safely reused across Game instances).
+
+### Chunk 6 — per-dino save data (v2) ✅
+Save schema bumped to **version 2**: `DinoSave` gains `rank` and
+`fossilProgrammePercent`. The store was already `dinos`-keyed, so v1→v2 is
+additive. `readRaw()` now **migrates** a detected v1 save in place (ports all
+existing per-dino progress — e.g. Eoraptor's missions/points — defaults the new
+fields, persists once) rather than discarding it on the version bump. Added an
+exported pure `migrateSave()` for the chunk-7 self-test. Game reads the dino's
+saved `rank` at mission start. Mission Select already reads per-dino completion
+for its lock/percent display (chunk 5).
+
+**Deferred (chunk 6):** rank-up logic and the Fossil Discovery Programme that
+*write* `rank` / `fossilProgrammePercent` are M5 — the fields exist and persist
+but stay at their defaults for now.

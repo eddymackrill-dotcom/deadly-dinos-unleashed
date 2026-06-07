@@ -1,5 +1,7 @@
+// Key kept stable across versions so existing progress isn't orphaned; the
+// `version` field drives migration in readRaw().
 const STORAGE_KEY = "deadly-dinos:v1";
-const SAVE_VERSION = 1;
+const SAVE_VERSION = 2;
 
 export interface MissionSave {
   completion: number; // best 0..1
@@ -16,6 +18,8 @@ export interface DinoSave {
   predatorPoints: number;
   missions: Record<string, MissionSave>;
   unlockedStyles: string[];
+  rank: number; // v2
+  fossilProgrammePercent: number; // v2
 }
 
 export interface SaveData {
@@ -28,7 +32,37 @@ function emptySave(): SaveData {
 }
 
 function emptyDinoSave(): DinoSave {
-  return { predatorPoints: 0, missions: {}, unlockedStyles: [] };
+  return { predatorPoints: 0, missions: {}, unlockedStyles: [], rank: 1, fossilProgrammePercent: 0 };
+}
+
+/** Coerce a raw (possibly v1) dino entry into a complete v2 DinoSave. */
+function normalizeDinoSave(raw: Partial<DinoSave> | undefined): DinoSave {
+  if (!raw) return emptyDinoSave();
+  const missions: Record<string, MissionSave> = {};
+  for (const [id, m] of Object.entries(raw.missions ?? {})) {
+    missions[id] = normalizeMissionSave(m);
+  }
+  return {
+    predatorPoints: raw.predatorPoints ?? 0,
+    missions,
+    unlockedStyles: Array.isArray(raw.unlockedStyles) ? [...raw.unlockedStyles] : [],
+    rank: raw.rank ?? 1,
+    fossilProgrammePercent: raw.fossilProgrammePercent ?? 0,
+  };
+}
+
+/**
+ * Migrate any older save into the current shape. v1 lacked per-dino `rank` and
+ * `fossilProgrammePercent`; we keep all existing per-dino progress (e.g.
+ * Eoraptor's missions/points) and default the new fields. Other dinos are left
+ * absent and default to empty on access.
+ */
+function migrate(parsed: { version?: number; dinos?: Record<string, Partial<DinoSave>> }): SaveData {
+  const dinos: Record<string, DinoSave> = {};
+  for (const [id, raw] of Object.entries(parsed.dinos ?? {})) {
+    dinos[id] = normalizeDinoSave(raw);
+  }
+  return { version: SAVE_VERSION, dinos };
 }
 
 function emptyMissionSave(): MissionSave {
@@ -59,12 +93,27 @@ function readRaw(): SaveData {
     if (!raw) return emptySave();
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== "object") return emptySave();
-    if (parsed.version !== SAVE_VERSION) return emptySave();
     if (!parsed.dinos || typeof parsed.dinos !== "object") return emptySave();
-    return parsed as SaveData;
+    if (parsed.version === SAVE_VERSION) return migrate(parsed); // normalise defensively
+    if (parsed.version === 1) {
+      // Port v1 → v2 and persist so the migration only runs once.
+      const migrated = migrate(parsed);
+      writeRaw(migrated);
+      return migrated;
+    }
+    return emptySave(); // unknown/future version — start fresh
   } catch {
     return emptySave();
   }
+}
+
+/** Pure migration entry point (exported for the self-test). */
+export function migrateSave(parsed: unknown): SaveData {
+  if (!parsed || typeof parsed !== "object") return emptySave();
+  const p = parsed as { version?: number; dinos?: Record<string, Partial<DinoSave>> };
+  if (!p.dinos || typeof p.dinos !== "object") return emptySave();
+  if (p.version === 1 || p.version === SAVE_VERSION) return migrate(p);
+  return emptySave();
 }
 
 function writeRaw(data: SaveData) {
