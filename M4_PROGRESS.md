@@ -138,3 +138,11 @@ for its lock/percent display (chunk 5).
 **Deferred (chunk 6):** rank-up logic and the Fossil Discovery Programme that
 *write* `rank` / `fossilProgrammePercent` are M5 — the fields exist and persist
 but stay at their defaults for now.
+
+### Chunk 7 — extended self-test ✅
+`src/levels/M4SelfTest.ts` (wired into `scripts/run-selftest.mjs`) covers: all 4
+dinos instantiate with stats matching the CLAUDE.md table; each animal power has
+the right id + hold/cooldown config + distinctive effect; each biome resolves and
+`buildBiomeWorld` constructs geometry without error (+ swamp water query); v1→v2
+save migration preserves Eoraptor progress and defaults the new fields; and all 4
+missions' scent sequences simulate to 6/6 completion. `npm test` is green.
