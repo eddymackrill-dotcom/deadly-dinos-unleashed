@@ -200,11 +200,11 @@ what was tried and what's outstanding. Don't quietly skip.
 
 | Milestone | Scope | Estimate |
 |---|---|---|
-| **M0 — Scaffold** | Vite/TS/Three/Rapier/React boot, empty scene renders | Day 1 |
-| **M1 — Feel** (MVP) | Above 9-point list; one polished dinosaur in one polished biome | Days 2–5 |
-| **M2 — Loop** | Scent → chase → catch → score. End-of-level summary. | Week 2 |
-| **M3 — Variety** | All 5 mechanics (scent, chase, stealth, defense, secrets) | Week 3 |
-| **M4 — Roster** | All 8 dinosaurs playable with unique powers | Week 4 |
+| **M0 — Scaffold** ✅ | Vite/TS/Three/Rapier/React boot, empty scene renders | Day 1 |
+| **M1 — Feel** (MVP) ✅ | Above 9-point list; one polished dinosaur in one polished biome | Days 2–5 |
+| **M2 — Loop** ✅ | Scent → chase → catch → score. End-of-level summary. | Week 2 |
+| **M3 — Variety** ✅ | All 5 mechanics (scent, chase, stealth, defense, secrets) | Week 3 |
+| **M4 — Roster** ✅ | 4-dino roster (Eoraptor, Deinonychus, T-Rex, Spinosaurus) across 4 biomes, unique hold-to-activate powers, Mission Select, per-dino saves. Other 4 dinos deferred to a later roster pass. `v0.4-m4` | Week 4 |
 | **M5 — Meta** | Ranks, cards, styles, collections, fossil programme | Week 5 |
 | **M6 — Polish** | Audio pass, particle pass, UI animation, accessibility | Week 6 |
 

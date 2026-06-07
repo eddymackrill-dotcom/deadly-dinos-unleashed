@@ -1,8 +1,48 @@
 # M4 — Roster: Progress Report
 
-Target tag: `v0.4-m4`
+Tag: `v0.4-m4`
 Goal: a **playable 4-dino demo** — 4 dinosaurs, 4 biomes, mission select, per-dino
 saves. Not a perfect one. Blockers logged here; work proceeds with fallbacks.
+
+## Summary — what shipped
+
+All 7 chunks landed (one commit each), `npm test` green, build clean.
+
+- **Roster** (`data/dinosaurs.ts`): Eoraptor, Deinonychus, T-Rex, Spinosaurus —
+  stats from the CLAUDE.md table; other 4 are commented placeholders.
+- **Powers** (`PowerSystem` + Game hooks): 4 hold-to-activate powers (Quick Dash,
+  Sickle Strike, Apex Roar, River Ambush), HUD-registered, obeying the M3 input
+  audit (work in chase, break stealth, locked in defense).
+- **Biomes** (`data/biomes.ts` + `Biome.ts`): Triassic, Jungle, Plains, Swamp —
+  data-driven sky/fog/light/parallax/props, swamp water tiles.
+- **Levels** (`data/levels.ts` + `buildLevel.ts`): 4 missions, distinct 6-node
+  sequences, 2 secrets each; Game is dino-driven (`new Game(canvas, dinoId)`).
+- **Mission Select** (`MissionSelect.tsx`): title → select → play → summary →
+  select; 4 cards, ≥50% unlock gating.
+- **Saves** (`Save.ts` v2): per-dino `rank` + `fossilProgrammePercent`, v1→v2
+  migration that preserves existing progress.
+- **Self-test** (`M4SelfTest.ts`): roster, powers, biomes, migration, 4 missions.
+
+## Deferred to M5+ (rollup)
+
+- **Per-biome creatures:** prey = Parasaurolophus and rival = T-Rex across all
+  biomes; swamp aquatic prey, jungle raptor rival, swamp Carcharodontosaurus need
+  meshes/sourcing.
+- **Spinosaurus model:** real GLB is heavy (596 meshes / 4.8 MB) and animation-less
+  — perf-watch; fall back to T-Rex mesh if it collapses on the Chromebook floor.
+- **Deinonychus mesh:** broken GLB → reusing the Velociraptor; source a real one.
+- **Rival combat from powers** (Apex Roar knock-back, Sickle rival stun): no
+  free-roam rival targets yet.
+- **Card art:** biome-gradient + name, not rendered model previews.
+- **Rank-up / Fossil Programme writes; sickle after-image trail; water ripple
+  shader.**
+- The other 4 dinosaurs (Herrerasaurus, Tarbosaurus, Albertosaurus,
+  Carcharodontosaurus).
+
+> ⚠️ The 4 missions are verified by build + simulation self-test and a clean dev
+> boot. A human playthrough of missions 2–4 (model scale/orientation per biome,
+> River Ambush in swamp water, Mission Select unlock flow) is the recommended
+> next check — the live WebGL canvas can't be driven headlessly here.
 
 ---
 
