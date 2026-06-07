@@ -190,24 +190,3 @@ export function trackingDuration(stats: DinoStats, base: number, moreTimeCard = 
   const cardMult = moreTimeCard ? 1.5 : 1;
   return base * sensesMult * cardMult;
 }
-
-// --- Legacy shim -----------------------------------------------------------
-// Game.ts reads EORAPTOR / DinoData until the mission-select refactor (Chunk 5)
-// migrates it onto DinoDef. Keep the old shape derived from the new source.
-export interface DinoData {
-  id: string;
-  name: string;
-  era: string;
-  region: string;
-  stats: DinoStats;
-  baseTrackingDuration: number;
-}
-
-export const EORAPTOR: DinoData = {
-  id: DINOS.eoraptor.id,
-  name: DINOS.eoraptor.displayName,
-  era: DINOS.eoraptor.era,
-  region: DINOS.eoraptor.region,
-  stats: DINOS.eoraptor.stats,
-  baseTrackingDuration: DINOS.eoraptor.baseTrackingDuration,
-};

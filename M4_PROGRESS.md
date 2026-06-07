@@ -84,3 +84,26 @@ Triassic config; Game calls `applyBiome`.
 - Sky gradient is a screen-space CanvasTexture background (cheap), not a domed sky.
 - Ground-prop colours are derived from each biome's parallax palette (brightened),
   keeping the brief's `ground.propMeshes: string[]` schema intact.
+
+### Chunk 4 — 4 levels, one per dino ✅
+`src/data/levels.ts` (4 `LevelConfig`s) + `src/levels/buildLevel.ts` (generic
+builder, replaces the hardcoded `createLevel1`; `L1_Eoraptor.ts` deleted). Game is
+now dino-driven: `new Game(canvas, dinoId)` looks up `DINOS[id]` + `LEVELS[id]`,
+applies the biome, loads the dino model (`modelPath`/`modelScale`), and wires
+stats/power/mission-id from data. Each mission has a distinct 6-node sequence and 2
+secrets:
+- M1 Eoraptor/Triassic — collect, chase, collect, stealth, defense, collect.
+- M2 Deinonychus/Jungle — chase-heavy (double chase).
+- M3 T-Rex/Plains — defense-heavy (double defense).
+- M4 Spinosaurus/Swamp — collect nodes sit on water tiles for River Ambush.
+
+**Deferred / deviations (chunk 4):**
+- **Prey/rival species reused, not per-biome.** All chases/stealth use the
+  Parasaurolophus prey and all defenses use the T-Rex rival, across every biome.
+  Biome-specific species (swamp aquatic prey, jungle raptor rival, swamp
+  Carcharodontosaurus rival) are deferred — they need procedural meshes or
+  sourcing (M5). Every mechanic is fully playable in every biome; only the
+  creature skins repeat. The T-Rex mission has a T-Rex rival (same species, two
+  roles) as a consequence.
+- Only Eoraptor is launched until Mission Select (chunk 5) passes a `dinoId`;
+  the other three level configs are exercised by the chunk-7 simulation self-test.

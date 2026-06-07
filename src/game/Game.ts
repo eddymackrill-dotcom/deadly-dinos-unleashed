@@ -4,7 +4,8 @@ import { Scene } from "./Scene";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
 import { PostProcess } from "./PostProcess";
-import { createLevel1 } from "../levels/L1_Eoraptor";
+import { buildLevel } from "../levels/buildLevel";
+import { LEVELS } from "../data/levels";
 import type { Level } from "../levels/Level";
 import type { CollectedEvent } from "../levels/ScentSequence";
 import { Dinosaur } from "../entities/Dinosaur";
@@ -16,12 +17,11 @@ import { StealthSystem } from "../systems/StealthSystem";
 import { DefenseSystem } from "../systems/DefenseSystem";
 import { HiddenSecretsSystem } from "../systems/HiddenSecretsSystem";
 import { PowerSystem } from "../systems/PowerSystem";
-import { EORAPTOR, trackingDuration, DINOS } from "../data/dinosaurs";
+import { trackingDuration, DINOS, type DinoId, type DinoDef } from "../data/dinosaurs";
 import { getBiome } from "../data/biomes";
 import { useGameState } from "../state/gameState";
 import { commitMissionResult, getDinoSave, getMissionSave } from "../progression/Save";
 
-const MISSION_ID = "L1_eoraptor";
 const JUMP_BUFFER_MS = 100;
 const REACH_RADIUS = 1.5;
 const CHASE_FOV = 28;
@@ -81,19 +81,26 @@ export class Game {
   private instantCatchActive = false; // Sickle Strike: contact = catch
   private shockwaveTimer = 0; // Apex Roar: pulse cadence
   private shownNeedsWater = false; // River Ambush: first-time tooltip guard
+  private readonly dino: DinoDef;
+  private readonly missionId: string;
   readonly fx: GameFX;
   private rafId: number | null = null;
   private running = false;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, dinoId: DinoId = "eoraptor") {
+    const dino = DINOS[dinoId];
+    const levelConfig = LEVELS[dinoId];
+    this.dino = dino;
+    this.missionId = levelConfig.id;
+
     this.scene = new Scene(canvas);
     this.camera = new Camera();
     this.clock = new THREE.Clock();
     this.input = new Input();
 
-    this.level = createLevel1();
+    this.level = buildLevel(levelConfig);
     this.scene.scene.add(this.level.root);
-    this.scene.applyBiome(getBiome(DINOS.eoraptor.biomeId));
+    this.scene.applyBiome(getBiome(dino.biomeId));
 
     this.player = new Dinosaur();
     this.scene.scene.add(this.player.root);
@@ -105,24 +112,24 @@ export class Game {
     const state = useGameState.getState();
     state.reset();
     state.setDino({
-      id: EORAPTOR.id,
-      name: EORAPTOR.name,
-      era: EORAPTOR.era,
-      region: EORAPTOR.region,
-      stats: EORAPTOR.stats,
+      id: dino.id,
+      name: dino.displayName,
+      era: dino.era,
+      region: dino.region,
+      stats: dino.stats,
       rank: 1,
     });
     state.setScentProgress(0, this.level.sequence.total);
 
-    const dinoSave = getDinoSave(EORAPTOR.id);
-    const missionSave = getMissionSave(EORAPTOR.id, MISSION_ID);
+    const dinoSave = getDinoSave(dino.id);
+    const missionSave = getMissionSave(dino.id, this.missionId);
     state.setPersistedTotals({
       totalPredatorPoints: dinoSave.predatorPoints,
       bestMissionCompletion: missionSave.completion,
       bestMissionPoints: missionSave.bestPoints,
     });
 
-    const duration = trackingDuration(EORAPTOR.stats, EORAPTOR.baseTrackingDuration);
+    const duration = trackingDuration(dino.stats, dino.baseTrackingDuration);
     this.tracking = new TrackingSystem(duration, () => this.onMissionFail());
 
     this.chase = new ChaseSystem({
@@ -155,7 +162,7 @@ export class Game {
         this.applySpeedMultiplier();
       },
       setPlayerTint: (color, mix, opacity) => this.player.setTint(color, mix, opacity),
-      sensesStat: EORAPTOR.stats.senses,
+      sensesStat: this.dino.stats.senses,
     });
     this.stealth.onResolved = (outcome) => {
       const ev = this.level.sequence.resolveEncounter(outcome);
@@ -172,7 +179,7 @@ export class Game {
       setPlayerTint: (color, mix, opacity) => this.player.setTint(color, mix, opacity),
       onCameraShake: (mag, dur) => this.camera.shake(mag, dur),
       onGlitchSting: () => this.fx.catchSting(),
-      toughnessStat: EORAPTOR.stats.toughness,
+      toughnessStat: this.dino.stats.toughness,
     });
     this.secrets = new HiddenSecretsSystem(
       { scene: this.scene.scene },
@@ -180,8 +187,8 @@ export class Game {
       missionSave.foundSecretIds ?? [],
     );
 
-    // Active dino's animal power (Eoraptor until Mission Select lands in chunk 5).
-    const power = DINOS.eoraptor.animalPower;
+    // The active dino's animal power (selected via Mission Select in chunk 5).
+    const power = dino.animalPower;
     this.power = new PowerSystem(power, {
       setSpeedMult: (m) => {
         this.powerSpeedMult = m;
@@ -246,8 +253,8 @@ export class Game {
     };
 
     void this.player.load({
-      url: "/models/eoraptor.glb",
-      targetHeight: 0.8,
+      url: dino.modelPath,
+      targetHeight: dino.modelScale,
       idleNameHint: "idle",
       runNameHint: "run",
     });
@@ -279,8 +286,8 @@ export class Game {
     const completion = seq.total === 0 ? 0 : successes / seq.total;
     const secretIds = this.secrets.getClaimedIds();
     const result = commitMissionResult({
-      dinoId: EORAPTOR.id,
-      missionId: MISSION_ID,
+      dinoId: this.dino.id,
+      missionId: this.missionId,
       completion,
       pointsEarned: seq.totalPointsEarned() + state.secretBonusPoints,
       foundSecretIds: secretIds,
