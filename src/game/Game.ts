@@ -11,9 +11,11 @@ import type { CollectedEvent } from "../levels/ScentSequence";
 import { Dinosaur } from "../entities/Dinosaur";
 import { PreyAnimal } from "../entities/PreyAnimal";
 import { Rival } from "../entities/Rival";
+import { WakeTrail } from "../entities/WakeTrail";
 import { TrackingSystem } from "../systems/TrackingSystem";
 import { ChaseSystem } from "../systems/ChaseSystem";
 import { StealthSystem } from "../systems/StealthSystem";
+import { FishingSystem } from "../systems/FishingSystem";
 import { DefenseSystem } from "../systems/DefenseSystem";
 import { HiddenSecretsSystem } from "../systems/HiddenSecretsSystem";
 import { PowerSystem } from "../systems/PowerSystem";
@@ -25,6 +27,10 @@ import { commitMissionResult, getDinoSave, getMissionSave } from "../progression
 const JUMP_BUFFER_MS = 100;
 const REACH_RADIUS = 1.5;
 const CHASE_FOV = 28;
+/** Wading is faster than walking the bank — Spinosaurus is at home in the river. */
+const WATER_SPEED_MULT = 1.3;
+/** How deep the mesh sits while wading (fraction of model height). */
+const WATER_SUBMERSION = 0.4;
 
 export class GameFX {
   constructor(private intensityRef: { value: number }) {}
@@ -71,16 +77,18 @@ export class Game {
   private tracking: TrackingSystem;
   private chase: ChaseSystem;
   private stealth: StealthSystem;
+  private fishing: FishingSystem;
   private defense: DefenseSystem;
   private secrets: HiddenSecretsSystem;
   private power: PowerSystem;
+  private wake: WakeTrail | null = null;
   private stealthSpeedMult = 1;
   private powerSpeedMult = 1;
+  private waterSpeedMult = 1;
   private inputLocked = false;
   // Power effect state (driven by the active dino's AnimalPower config).
   private instantCatchActive = false; // Sickle Strike: contact = catch
   private shockwaveTimer = 0; // Apex Roar: pulse cadence
-  private shownNeedsWater = false; // River Ambush: first-time tooltip guard
   private readonly dino: DinoDef;
   private readonly missionId: string;
   readonly fx: GameFX;
@@ -170,6 +178,33 @@ export class Game {
       if (ev && ev.kind === "collected") this.applyCollected(ev);
     };
 
+    // Spinosaurus fish-catching. Only the swamp level has water tiles, so on
+    // every other mission this system simply never starts.
+    this.fishing = new FishingSystem({
+      scene: this.scene.scene,
+      setChevronOverride: (x) => this.level.setChevronTargetOverride(x),
+      onCameraShake: (mag, dur) => this.camera.shake(mag, dur),
+      onGlitchSting: () => this.fx.catchSting(),
+      setPlayerInputLocked: (locked) => {
+        this.inputLocked = locked;
+      },
+      waterRangeFor: (x) => this.level.waterRangeAt?.(x) ?? null,
+      playerWadeSpeed: 5.0 * WATER_SPEED_MULT,
+    });
+    this.fishing.onResolved = (outcome) => {
+      const ev = this.level.sequence.resolveEncounter(outcome);
+      if (ev && ev.kind === "collected") this.applyCollected(ev);
+    };
+    this.fishing.onFishCaught = (fish) => {
+      fish.setOpacity(0.35);
+      useGameState.getState().pushRewardPopup("FISH!");
+    };
+
+    if (getBiome(dino.biomeId).water) {
+      this.wake = new WakeTrail();
+      this.scene.scene.add(this.wake.root);
+    }
+
     this.defense = new DefenseSystem({
       scene: this.scene.scene,
       input: this.input,
@@ -190,6 +225,7 @@ export class Game {
 
     // The active dino's animal power (selected via Mission Select in chunk 5).
     const power = dino.animalPower;
+    state.setPowerName(power.displayName);
     this.power = new PowerSystem(power, {
       setSpeedMult: (m) => {
         this.powerSpeedMult = m;
@@ -199,9 +235,12 @@ export class Game {
         this.fx.dashBurst();
         this.shockwaveTimer = 0;
         this.instantCatchActive = !!power.instantCatch;
-        if (power.transparentWhileActive) {
-          // River Ambush: vanish beneath the surface.
-          this.player.setTint(new THREE.Color(power.tintColor ?? "#3fb6ff"), 0.4, 0.3);
+        if (power.jawSnap) {
+          // Jaw Snap: lunge, and open the extended catch hitbox for the window.
+          const facing: 1 | -1 = this.player.facingDirection;
+          this.player.playJawSnap(facing, power.jawSnap.windowMs);
+          this.fishing.triggerSnap(facing);
+          this.camera.shake(0.08, 0.08);
         } else if (power.trail) {
           // Sickle Strike: glowing surge (full after-image trail deferred — M5).
           this.player.setTint(new THREE.Color(power.tintColor ?? "#ffd24a"), 0.4, 1);
@@ -223,23 +262,6 @@ export class Game {
           }
         }
       },
-      canActivate: power.requiresWater ? () => this.isPlayerInWater() : undefined,
-      onActivateRejected: power.requiresWater
-        ? () => {
-            if (!this.shownNeedsWater) {
-              this.shownNeedsWater = true;
-              useGameState.getState().pushRewardPopup("NEEDS WATER");
-            }
-          }
-        : undefined,
-      onRelease: power.teleportOnRelease
-        ? () => {
-            // River Ambush: surface at the next trail point if released in water.
-            if (!this.isPlayerInWater()) return;
-            const next = this.level.sequence.getActive();
-            if (next) this.player.position.x = next.position.x;
-          }
-        : undefined,
     });
 
     this.defense.onResolved = (outcome) => {
@@ -258,6 +280,7 @@ export class Game {
       targetHeight: dino.modelScale,
       idleNameHint: "idle",
       runNameHint: "run",
+      baseRotationY: dino.modelRotationY,
     });
 
     // Warm the GLB caches so the first chase / defense doesn't pop in.
@@ -272,12 +295,30 @@ export class Game {
   }
 
   private applySpeedMultiplier() {
-    this.player.setSpeedMultiplier(this.stealthSpeedMult * this.powerSpeedMult);
+    this.player.setSpeedMultiplier(
+      this.stealthSpeedMult * this.powerSpeedMult * this.waterSpeedMult,
+    );
   }
 
-  /** True if the active dino is standing on a level water tile (River Ambush). */
+  /** True if the active dino is standing on a level water tile. */
   private isPlayerInWater(): boolean {
     return this.level.isWater?.(this.player.position.x) ?? false;
+  }
+
+  /**
+   * Wading: in water the dino sits ~40% submerged, moves 30% faster, and drags a
+   * bow wake behind it. Applied every frame so entering/leaving the river is
+   * driven purely by position — no state to get stuck.
+   */
+  private updateWading(dt: number) {
+    const inWater = this.isPlayerInWater();
+    const targetMult = inWater ? WATER_SPEED_MULT : 1;
+    if (targetMult !== this.waterSpeedMult) {
+      this.waterSpeedMult = targetMult;
+      this.applySpeedMultiplier();
+    }
+    this.player.setSubmersion(inWater ? WATER_SUBMERSION : 0);
+    this.wake?.update(dt, inWater, this.player.position.x, this.player.speed);
   }
 
   private commitMissionToSave() {
@@ -359,9 +400,11 @@ export class Game {
 
     this.power.update(dt);
     this.player.update(dt);
+    this.updateWading(dt);
     this.camera.update(dt);
     this.chase.update(dt, this.player.position);
     this.stealth.update(dt, this.player.position);
+    this.fishing.update(dt, this.player.position);
     this.defense.update(dt);
     this.secrets.update(dt, this.player.position);
     this.level.update({
@@ -403,6 +446,8 @@ export class Game {
         this.chase.start(ev.position.x, facing);
       } else if (ev.nodeType === "stealth") {
         this.stealth.start(ev.position.x, facing);
+      } else if (ev.nodeType === "fish") {
+        this.fishing.start(ev.position.x, facing);
       } else if (ev.nodeType === "defense") {
         this.defense.start(ev.position.x, facing);
       }
@@ -431,6 +476,11 @@ export class Game {
   dispose() {
     this.stop();
     this.input.dispose();
+    if (this.wake) {
+      this.scene.scene.remove(this.wake.root);
+      this.wake.dispose();
+      this.wake = null;
+    }
     this.secrets.dispose();
     this.level.dispose();
     this.postProcess.dispose();

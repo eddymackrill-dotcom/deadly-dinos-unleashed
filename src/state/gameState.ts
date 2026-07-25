@@ -7,7 +7,7 @@ export type MissionStatus = "playing" | "failed" | "complete";
 export type ChaseOutcome = "win" | "lose" | "partial";
 
 /** Which encounter produced the current result flash — picks the right verb. */
-export type EncounterSource = "chase" | "stealth" | "defense";
+export type EncounterSource = "chase" | "stealth" | "defense" | "fish";
 
 export interface DefensePromptView {
   arrow: ArrowDir;
@@ -84,6 +84,12 @@ export interface MissionState {
   stealthPercent: number;
   stealthInBush: boolean;
 
+  /** Spinosaurus fish-catching encounter. */
+  fishingActive: boolean;
+  fishingPercent: number; // encounter timer, 0..1
+  fishCaught: number;
+  fishNeeded: number;
+
   defenseActive: boolean;
   defenseTotalRounds: number;
   defenseIntro: DefenseIntroView | null;
@@ -96,6 +102,8 @@ export interface MissionState {
   secretBonusPoints: number;
   rewardPopup: { id: number; text: string; spawnedAt: number } | null;
 
+  /** Display name of the active dino's animal power (HUD label under the X icon). */
+  powerName: string;
   powerReady: boolean;
   powerActive: boolean;
   powerCooldownPercent: number; // 1.0 = just fired, 0 = ready
@@ -122,6 +130,9 @@ export interface MissionState {
   startStealth: () => void;
   setStealthState: (percent: number, inBush: boolean) => void;
   endStealth: (result: ChaseOutcome, flashUntil: number) => void;
+  startFishing: (needed: number) => void;
+  setFishingState: (percent: number, caught: number) => void;
+  endFishing: (result: ChaseOutcome, flashUntil: number) => void;
   startDefense: (totalRounds: number, showInstructions: boolean) => void;
   setDefenseIntro: (intro: DefenseIntroView | null) => void;
   setDefensePrompt: (prompt: DefensePromptView | null) => void;
@@ -131,6 +142,7 @@ export interface MissionState {
   setHiddenSecretsProgress: (claimed: number, total: number) => void;
   addSecretPoints: (points: number) => void;
   pushRewardPopup: (text: string) => void;
+  setPowerName: (name: string) => void;
   setPowerState: (info: {
     ready: boolean;
     active: boolean;
@@ -167,6 +179,9 @@ const initial: Omit<
   | "startStealth"
   | "setStealthState"
   | "endStealth"
+  | "startFishing"
+  | "setFishingState"
+  | "endFishing"
   | "startDefense"
   | "setDefenseIntro"
   | "setDefensePrompt"
@@ -176,6 +191,7 @@ const initial: Omit<
   | "setHiddenSecretsProgress"
   | "addSecretPoints"
   | "pushRewardPopup"
+  | "setPowerName"
   | "setPowerState"
   | "pushShockwave"
   | "setScentResults"
@@ -211,6 +227,11 @@ const initial: Omit<
   stealthPercent: 1,
   stealthInBush: false,
 
+  fishingActive: false,
+  fishingPercent: 1,
+  fishCaught: 0,
+  fishNeeded: 0,
+
   defenseActive: false,
   defenseTotalRounds: 0,
   defenseIntro: null,
@@ -223,6 +244,7 @@ const initial: Omit<
   secretBonusPoints: 0,
   rewardPopup: null,
 
+  powerName: "POWER",
   powerReady: true,
   powerActive: false,
   powerCooldownPercent: 0,
@@ -274,6 +296,24 @@ export const useGameState = create<MissionState>((set) => ({
       chaseResultFlashUntil: flashUntil,
       chaseResultSource: "stealth",
     }),
+  startFishing: (needed) =>
+    set({
+      fishingActive: true,
+      fishingPercent: 1,
+      fishCaught: 0,
+      fishNeeded: needed,
+      chaseResult: null,
+      chaseResultLabel: null,
+    }),
+  setFishingState: (percent, caught) =>
+    set({ fishingPercent: Math.max(0, Math.min(1, percent)), fishCaught: caught }),
+  endFishing: (result, flashUntil) =>
+    set({
+      fishingActive: false,
+      chaseResult: result,
+      chaseResultFlashUntil: flashUntil,
+      chaseResultSource: "fish",
+    }),
   startDefense: (totalRounds, showInstructions) =>
     set({
       defenseActive: true,
@@ -306,6 +346,7 @@ export const useGameState = create<MissionState>((set) => ({
     set((s) => ({ secretBonusPoints: s.secretBonusPoints + points })),
   pushRewardPopup: (text) =>
     set({ rewardPopup: { id: rewardPopupCounter++, text, spawnedAt: performance.now() } }),
+  setPowerName: (name) => set({ powerName: name }),
   setPowerState: (info) =>
     set((s) => ({
       powerReady: info.ready,

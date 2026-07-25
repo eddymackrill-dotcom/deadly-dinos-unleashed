@@ -82,25 +82,26 @@ export const LEVELS: Record<DinoId, LevelConfig> = {
     ledges: [{ x: 74, y: 1.2, halfWidth: 1.8 }],
   },
 
-  // Mission 4 — Spinosaurus, Swamp. Water tiles at [12,22],[44,56],[80,92]
-  // (see biomes.ts) — collect nodes sit in water so River Ambush traversal pays off.
+  // Mission 4 — Spinosaurus, Swamp. The river runs [30,70] (see biomes.ts): the
+  // three fish nodes sit in the water, everything else is on the banks. No chase
+  // node on this level — fish-catching is Spinosaurus's hunting mechanic.
   spinosaurus: {
     id: "L4_spinosaurus",
     dinoId: "spinosaurus",
     biomeId: "cretaceous_swamp",
     nodes: [
-      { position: new THREE.Vector3(16, 0.4, 0), type: "collect", points: 100 }, // water
-      { position: new THREE.Vector3(30, 0.4, 0), type: "chase", points: 250 },
-      { position: new THREE.Vector3(40, 0.4, 0), type: "collect", points: 100 },
-      { position: new THREE.Vector3(50, 0.4, 0), type: "stealth", points: 300 }, // water
-      { position: new THREE.Vector3(68, 0.4, 0), type: "defense", points: 300 },
-      { position: new THREE.Vector3(86, 0.4, 0), type: "collect", points: 100 }, // water
+      { position: new THREE.Vector3(12, 0.4, 0), type: "collect", points: 100 }, // near bank
+      { position: new THREE.Vector3(22, 0.4, 0), type: "stealth", points: 300 }, // reeds
+      { position: new THREE.Vector3(38, 0.4, 0), type: "fish", points: 200 }, // water
+      { position: new THREE.Vector3(52, 0.4, 0), type: "fish", points: 200 }, // water
+      { position: new THREE.Vector3(66, 0.4, 0), type: "fish", points: 200 }, // water
+      { position: new THREE.Vector3(84, 0.4, 0), type: "defense", points: 300 }, // far bank
     ],
     secrets: [
-      { id: "l4_secret_ground_60", position: new THREE.Vector3(60, 0.4, 0), pointsRange: [150, 350] },
-      { id: "l4_secret_ledge_74", position: new THREE.Vector3(74, 1.45, 0), pointsRange: [250, 550] },
+      { id: "l4_secret_ground_76", position: new THREE.Vector3(76, 0.4, 0), pointsRange: [150, 350] },
+      { id: "l4_secret_ledge_26", position: new THREE.Vector3(26, 1.45, 0), pointsRange: [250, 550] },
     ],
-    ledges: [{ x: 74, y: 1.1, halfWidth: 1.6 }],
+    ledges: [{ x: 26, y: 1.1, halfWidth: 1.6 }],
   },
 };
 

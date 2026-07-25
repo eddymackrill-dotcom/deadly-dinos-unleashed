@@ -19,7 +19,7 @@ export interface BiomeConfig {
   fogColor: string;
   fogNear: number;
   fogFar: number;
-  /** Swamp only — water tile x-ranges (world space) + tint. Drives River Ambush. */
+  /** Swamp only — water tile x-ranges (world space) + tint. Drives wading + fishing. */
   water?: { color: string; tiles: Array<[number, number]> };
 }
 
@@ -92,12 +92,10 @@ export const BIOMES: Record<BiomeId, BiomeConfig> = {
     fogFar: 50,
     water: {
       color: "#2a8fa0",
-      // Aligns with the Spinosaurus level's scent layout (chunk 4).
-      tiles: [
-        [12, 22],
-        [44, 56],
-        [80, 92],
-      ],
+      // One continuous river across the middle third of the traversable level
+      // (~0–100). All three fish nodes sit inside it; land either side carries
+      // the collect / stealth / defense nodes.
+      tiles: [[30, 70]],
     },
   },
 };

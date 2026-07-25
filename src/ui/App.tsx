@@ -124,6 +124,44 @@ function StealthBar() {
   );
 }
 
+function FishingBar() {
+  const active = useGameState((s) => s.fishingActive);
+  const pct = useGameState((s) => s.fishingPercent);
+  const caught = useGameState((s) => s.fishCaught);
+  const needed = useGameState((s) => s.fishNeeded);
+  if (!active) return null;
+  const danger = pct < 0.3;
+  return (
+    <div className="absolute top-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 pointer-events-none select-none">
+      <div className="flex items-center gap-2">
+        <span className="text-xl" aria-hidden>
+          🐟
+        </span>
+        <div className="font-display text-cyan-100 text-lg tracking-[0.3em] drop-shadow">
+          FISHING
+        </div>
+      </div>
+      <div className="relative h-3 w-72 bg-black/55 rounded-full overflow-hidden border border-white/15">
+        <div
+          className="absolute left-0 top-0 bottom-0 transition-[width] duration-75 ease-linear"
+          style={{
+            width: `${pct * 100}%`,
+            background: danger
+              ? "linear-gradient(90deg, #ffae42, #ff4d6a)"
+              : "linear-gradient(90deg, #7ce8ff, #4aa3ff)",
+          }}
+        />
+      </div>
+      <div className="flex items-center gap-2 font-ui text-xs text-white/75 tracking-wide">
+        <span>
+          CAUGHT {caught} OF {needed}
+        </span>
+        <span className="text-white/45">· HOLD X TO SNAP</span>
+      </div>
+    </div>
+  );
+}
+
 // Single arrow asset rotated per direction — guarantees all 4 render at
 // identical pixel dimensions (unicode glyphs vary in size per direction).
 const ARROW_ROTATION: Record<ArrowDir, number> = {
@@ -342,6 +380,7 @@ const RESULT_VERBS: Record<EncounterSource, { win: string; lose: string }> = {
   chase: { win: "CAUGHT!", lose: "ESCAPED!" },
   stealth: { win: "POUNCED!", lose: "SPOTTED!" },
   defense: { win: "DEFENDED!", lose: "OVERPOWERED!" },
+  fish: { win: "SNAPPED!", lose: "SLIPPED AWAY!" },
 };
 
 function ChaseResultFlash() {
@@ -403,6 +442,7 @@ function PowerIcon() {
   const ready = useGameState((s) => s.powerReady);
   const active = useGameState((s) => s.powerActive);
   const pct = useGameState((s) => s.powerCooldownPercent);
+  const powerName = useGameState((s) => s.powerName);
 
   const size = 56;
   const r = size / 2 - 4;
@@ -451,7 +491,7 @@ function PowerIcon() {
         className="font-display tracking-widest text-[10px] leading-none"
         style={{ color: active ? "#ff8e9e" : ready ? "#9ff0c0" : "#ffd166" }}
       >
-        {active ? "ACTIVE · HOLD" : ready ? "DASH" : "COOLDOWN"}
+        {active ? "ACTIVE · HOLD" : ready ? powerName.toUpperCase() : "COOLDOWN"}
       </div>
     </div>
   );
@@ -570,6 +610,7 @@ function HUD() {
       <PowerIcon />
       <ChaseTimerBar />
       <StealthBar />
+      <FishingBar />
       <DefenseOverlay />
       <RewardPopup />
       <PowerBurstTint />

@@ -8,11 +8,14 @@ import {
   hexToInt,
   type MeshType,
 } from "./biomeMeshes";
+import { createWaterMaterial, type WaterMaterial } from "../shaders/water";
 
 export interface BiomeWorld {
   root: THREE.Group;
-  /** True if world-X falls on a water tile (drives River Ambush). */
+  /** True if world-X falls on a water tile (drives wading + fishing). */
   isWater: (x: number) => boolean;
+  /** The [x0,x1] water tile containing world-X, or null on dry land. */
+  waterRangeAt: (x: number) => [number, number] | null;
   /** Advance parallax (and any water animation). */
   update: (cameraX: number, dt: number) => void;
   dispose: () => void;
@@ -79,17 +82,12 @@ export function buildBiomeWorld(biome: BiomeConfig): BiomeWorld {
   root.add(ground);
 
   const waterRanges: Array<[number, number]> = biome.water?.tiles ?? [];
-  const waterMats: THREE.MeshLambertMaterial[] = [];
+  const waterMats: WaterMaterial[] = [];
   if (biome.water) {
     for (const [x0, x1] of biome.water.tiles) {
-      const mat = new THREE.MeshLambertMaterial({
-        color: hexToInt(biome.water.color),
-        transparent: true,
-        opacity: 0.82,
-        flatShading: true,
-      });
+      const mat = createWaterMaterial(hexToInt(biome.water.color));
       waterMats.push(mat);
-      const wm = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, 6), mat);
+      const wm = new THREE.Mesh(new THREE.PlaneGeometry(x1 - x0, 8), mat);
       wm.rotation.x = -Math.PI / 2;
       wm.position.set((x0 + x1) / 2, 0.03, 0); // just above ground (avoid z-fight)
       wm.name = "water";
@@ -120,13 +118,12 @@ export function buildBiomeWorld(biome: BiomeConfig): BiomeWorld {
   return {
     root,
     isWater: (x: number) => waterRanges.some(([a, b]) => x >= a && x <= b),
+    waterRangeAt: (x: number) => waterRanges.find(([a, b]) => x >= a && x <= b) ?? null,
     update: (cameraX: number, dt: number) => {
       parallax.update(cameraX);
-      // Cheap "ripple": gently pulse water opacity instead of a shader (perf floor).
       if (waterMats.length > 0) {
         waterClock += dt;
-        const o = 0.78 + Math.sin(waterClock * 1.6) * 0.06;
-        for (const m of waterMats) m.opacity = o;
+        for (const m of waterMats) m.uniforms.uTime.value = waterClock;
       }
     },
     dispose: () => disposeTree(root),

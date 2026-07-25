@@ -80,6 +80,7 @@ export function buildLevel(config: LevelConfig): Level {
       chevronOverrideX = x;
     },
     isWater: (x) => world.isWater(x),
+    waterRangeAt: (x) => world.waterRangeAt(x),
     dispose() {
       for (const n of nodes) n.dispose();
       chevron.dispose();

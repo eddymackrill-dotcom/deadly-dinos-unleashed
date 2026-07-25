@@ -22,9 +22,11 @@ export interface Level {
    */
   setChevronTargetOverride(x: number | null): void;
   /**
-   * Whether world-X falls on a water tile (River Ambush). Optional — levels
+   * Whether world-X falls on a water tile (wading + fishing). Optional — levels
    * without water omit it (treated as false). Implemented by the swamp level.
    */
   isWater?(x: number): boolean;
+  /** The [x0,x1] water tile containing world-X, or null on dry land. */
+  waterRangeAt?(x: number): [number, number] | null;
   dispose(): void;
 }

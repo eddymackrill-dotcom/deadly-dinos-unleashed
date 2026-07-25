@@ -10,6 +10,7 @@ const NODE_LABELS: Record<ScentNodeType, string> = {
   chase: "Chase",
   stealth: "Stealth Hunt",
   defense: "Defense",
+  fish: "Fish Catch",
 };
 
 const STAT_LABELS: Array<{ key: keyof DinoStatsView; label: string; tint: string }> = [

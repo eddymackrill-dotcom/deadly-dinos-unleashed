@@ -14,7 +14,7 @@ export type AnimalPowerId =
   | "quick_dash"
   | "sickle_strike"
   | "apex_roar"
-  | "river_ambush";
+  | "jaw_snap";
 
 export type BiomeId =
   | "triassic_argentina"
@@ -45,12 +45,12 @@ export interface AnimalPower {
   shockwave?: { intervalSeconds: number; radius: number };
   /** Subtle continuous screen shake while held (T-Rex). */
   screenShake?: boolean;
-  /** Only functions on a level water tile; outside water X is a no-op (Spinosaurus). */
-  requiresWater?: boolean;
-  /** Player turns transparent while active (Spinosaurus). */
-  transparentWhileActive?: boolean;
-  /** On release while in water near a node, teleport to the next scent node (Spinosaurus). */
-  teleportOnRelease?: boolean;
+  /**
+   * Jaw Snap (Spinosaurus): activation opens a short catch window in which the
+   * catch hitbox extends `reachUnits` ahead of the snout. Any fish inside it
+   * when the jaws close is caught.
+   */
+  jawSnap?: { reachUnits: number; windowMs: number };
   /** Screen-tint colour during activation (hex), matches the dino. */
   tintColor?: string;
 }
@@ -63,6 +63,13 @@ export interface DinoDef {
   modelPath: string;
   /** In-world target height in units; the loader scales the mesh to this. */
   modelScale: number;
+  /**
+   * Y-rotation (radians) that turns the raw GLB so the animal faces +X. The
+   * Quaternius rigs all model forward on -Z, hence the π/2 default; the
+   * Spinosaurus mesh is a static sculpt posed on a diagonal and needs its own
+   * value (see PATCH_04_1_PROGRESS.md).
+   */
+  modelRotationY?: number;
   stats: DinoStats;
   /** Base seconds for the tracking bar before senses / power-card modifiers. */
   baseTrackingDuration: number;
@@ -150,20 +157,21 @@ export const DINOS: Record<DinoId, DinoDef> = {
     region: "North Africa, 99 mya",
     modelPath: "/models/player_spinosaurus.glb",
     modelScale: 1.7,
+    // Measured from the GLB: the sculpt's snout→tail axis sits at -52.75° in XZ,
+    // so this is the rotation that lands it facing +X like the rest of the roster.
+    modelRotationY: -0.9207,
     stats: { speed: 8, toughness: 10, power: 11, senses: 8 },
     baseTrackingDuration: 26,
     biomeId: "cretaceous_swamp",
     animalPower: {
-      id: "river_ambush",
-      displayName: "River Ambush",
-      description: "Hold X in water to vanish and surge (+100%). Release near a trail to ambush ahead.",
+      id: "jaw_snap",
+      displayName: "Jaw Snap",
+      description: "Hold X to lunge — the jaws reach 2 units ahead and snap up any fish in front.",
       cooldownSeconds: 8,
       maxHoldSeconds: 3,
       cooldownHoldFactor: 1.5,
-      speedMultiplier: 2.0,
-      requiresWater: true,
-      transparentWhileActive: true,
-      teleportOnRelease: true,
+      speedMultiplier: 1.2,
+      jawSnap: { reachUnits: 2, windowMs: 300 },
       tintColor: "#3fb6ff",
     },
   },

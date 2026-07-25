@@ -51,7 +51,7 @@ function testPowers() {
     eoraptor: "quick_dash",
     deinonychus: "sickle_strike",
     trex: "apex_roar",
-    spinosaurus: "river_ambush",
+    spinosaurus: "jaw_snap",
   };
   for (const id of DINO_ORDER) {
     const p = DINOS[id].animalPower;
@@ -65,8 +65,10 @@ function testPowers() {
   assert(DINOS.eoraptor.animalPower.speedMultiplier === 1.6, `${tag}: Quick Dash +60%`);
   assert(DINOS.deinonychus.animalPower.instantCatch === true, `${tag}: Sickle Strike instantCatch`);
   assert(!!DINOS.trex.animalPower.shockwave, `${tag}: Apex Roar shockwave`);
-  assert(DINOS.spinosaurus.animalPower.requiresWater === true, `${tag}: River Ambush requiresWater`);
-  assert(DINOS.spinosaurus.animalPower.speedMultiplier === 2.0, `${tag}: River Ambush +100%`);
+  const jaw = DINOS.spinosaurus.animalPower.jawSnap;
+  assert(!!jaw, `${tag}: Jaw Snap has a jawSnap config`);
+  assert(jaw!.reachUnits === 2, `${tag}: Jaw Snap reaches 2 units (got ${jaw!.reachUnits})`);
+  assert(jaw!.windowMs === 300, `${tag}: Jaw Snap window is 300ms (got ${jaw!.windowMs})`);
   console.log(`${tag} 4 powers configured (hold 3s, cd ×1.5) with correct effects — OK`);
 }
 
@@ -83,10 +85,14 @@ function testBiomes() {
     assert(world.root.children.length > 0, `${tag}: ${biomeId} world has geometry`);
     world.dispose();
   }
-  // Swamp water query.
+  // Swamp river query — one continuous band across the middle third.
   const swamp = buildBiomeWorld(BIOMES.cretaceous_swamp);
-  assert(swamp.isWater(16) === true, `${tag}: swamp x=16 is water`);
-  assert(swamp.isWater(35) === false, `${tag}: swamp x=35 is dry land`);
+  assert(swamp.isWater(50) === true, `${tag}: swamp x=50 is water`);
+  assert(swamp.isWater(16) === false, `${tag}: swamp x=16 is dry bank`);
+  assert(swamp.isWater(84) === false, `${tag}: swamp x=84 is dry bank`);
+  const range = swamp.waterRangeAt(50);
+  assert(!!range && range[0] === 30 && range[1] === 70, `${tag}: river spans [30,70]`);
+  assert(swamp.waterRangeAt(16) === null, `${tag}: no water range on the bank`);
   swamp.dispose();
   // Non-swamp biomes have no water.
   const tri = buildBiomeWorld(BIOMES.triassic_argentina);

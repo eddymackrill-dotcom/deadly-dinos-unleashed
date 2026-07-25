@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export type ScentNodeType = "collect" | "chase" | "stealth" | "defense";
+export type ScentNodeType = "collect" | "chase" | "stealth" | "defense" | "fish";
 
 export type EncounterOutcome = "win" | "lose" | "partial";
 
