@@ -4,6 +4,7 @@ import { BIOMES, getBiome } from "../data/biomes";
 import { buildBiomeWorld } from "./Biome";
 import { ScentSequence } from "./ScentSequence";
 import { migrateSave } from "../progression/Save";
+import { nodePoints } from "../data/scoring";
 
 /**
  * M4 logic self-tests: roster data integrity, animal-power config, biome
@@ -139,6 +140,14 @@ function testMissionSequences() {
     assert(config.dinoId === id, `${tag}: ${id} level dinoId matches`);
     assert(config.nodes.length === 6, `${tag}: ${id} has 6 nodes (got ${config.nodes.length})`);
     assert(config.secrets.length === 2, `${tag}: ${id} has 2 secrets`);
+
+    // Flat economy: every node carries exactly its type's fixed value.
+    for (const n of config.nodes) {
+      assert(
+        n.points === nodePoints(n.type),
+        `${tag}: ${id} ${n.type} node worth ${n.points}, expected ${nodePoints(n.type)}`,
+      );
+    }
 
     // Simulate the whole sequence: walk to each active node, win every encounter.
     const seq = new ScentSequence(config.nodes);

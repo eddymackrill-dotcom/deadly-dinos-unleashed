@@ -21,6 +21,7 @@ import { CatchFX } from "../systems/CatchFX";
 import { HiddenSecretsSystem } from "../systems/HiddenSecretsSystem";
 import { PowerSystem } from "../systems/PowerSystem";
 import { trackingDuration, DINOS, type DinoId, type DinoDef } from "../data/dinosaurs";
+import { SCORE } from "../data/scoring";
 import { getBiome } from "../data/biomes";
 import { useGameState } from "../state/gameState";
 import { commitMissionResult, getDinoSave, getMissionSave } from "../progression/Save";
@@ -291,12 +292,11 @@ export class Game {
     });
 
     this.defense.onResolved = (outcome) => {
-      const basePoints = this.level.sequence.getActivePoints();
-      const ratio = this.defense.partialPointsRatio();
-      const partialPoints = Math.round(basePoints * ratio);
+      // Flat economy: all three arrows = 200, any credit = 100, none = 0. The
+      // hit ratio decides win/partial/lose, it does not scale the award.
       const ev = this.level.sequence.resolveEncounter(
         outcome,
-        outcome === "partial" ? partialPoints : undefined,
+        outcome === "partial" ? SCORE.defensePartial : undefined,
       );
       if (ev && ev.kind === "collected") this.applyCollected(ev);
     };
@@ -347,6 +347,18 @@ export class Game {
     this.wake?.update(dt, inWater, this.player.position.x, this.player.speed);
   }
 
+  /**
+   * The mission-complete bonus: a flat 500, and only when every activity in the
+   * mission was completed successfully. A partial or missed node forfeits it.
+   */
+  private missionBonusFor(): number {
+    const seq = this.level.sequence;
+    if (!seq.isComplete) return 0;
+    const results = seq.getResults();
+    const allWon = results.length === seq.total && results.every((r) => r.outcome === "win");
+    return allWon ? SCORE.missionCompleteBonus : 0;
+  }
+
   private commitMissionToSave() {
     const state = useGameState.getState();
     const seq = this.level.sequence;
@@ -357,7 +369,8 @@ export class Game {
       dinoId: this.dino.id,
       missionId: this.missionId,
       completion,
-      pointsEarned: seq.totalPointsEarned() + state.secretBonusPoints,
+      pointsEarned:
+        seq.totalPointsEarned() + state.secretBonusPoints + state.missionBonusPoints,
       foundSecretIds: secretIds,
       hiddenSecretsFound: this.secrets.claimedCount,
     });
@@ -493,6 +506,7 @@ export class Game {
     );
 
     if (seq.isComplete) {
+      state.setMissionBonus(this.missionBonusFor());
       state.setStatus("complete");
       this.commitMissionToSave();
     } else if (ev.outcome === "win") {

@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { useGameState, type ScentResultView, type DinoStatsView } from "../state/gameState";
 import type { ScentNodeType } from "../levels/ScentSequence";
+import { SCORE } from "../data/scoring";
 
 const STAT_MAX = 12;
 
@@ -117,6 +118,29 @@ function ResultRow({ r, ordinal }: { r: ScentResultView; ordinal: number }) {
   );
 }
 
+function BreakdownRow({
+  label,
+  value,
+  muted = false,
+}: {
+  label: string;
+  value: number;
+  muted?: boolean;
+}) {
+  return (
+    <li className="flex items-center justify-between gap-3 py-1">
+      <span className={`font-ui text-sm ${muted ? "text-white/35" : "text-white/80"}`}>{label}</span>
+      <span
+        className={`font-display tabular-nums text-sm tracking-wider ${
+          muted ? "text-white/30" : "text-amber-200"
+        }`}
+      >
+        +{value}
+      </span>
+    </li>
+  );
+}
+
 interface ScoreSummaryProps {
   onRestart: () => void;
   onMissions: () => void;
@@ -130,7 +154,10 @@ export function ScoreSummary({ onRestart, onMissions }: ScoreSummaryProps) {
   const stats = useGameState((s) => s.dinoStats);
   const rank = useGameState((s) => s.rank);
   const results = useGameState((s) => s.scentResults);
-  const points = useGameState((s) => s.predatorPointsEarned);
+  const activityPoints = useGameState((s) => s.predatorPointsEarned);
+  const secretPoints = useGameState((s) => s.secretBonusPoints);
+  const secretsClaimed = useGameState((s) => s.hiddenSecretsClaimed);
+  const missionBonus = useGameState((s) => s.missionBonusPoints);
   const scentTotal = useGameState((s) => s.scentTotal);
   const totalPredatorPoints = useGameState((s) => s.totalPredatorPoints);
   const bestMissionCompletion = useGameState((s) => s.bestMissionCompletion);
@@ -152,6 +179,7 @@ export function ScoreSummary({ onRestart, onMissions }: ScoreSummaryProps) {
 
   const successCount = results.filter((r) => r.outcome === "win").length;
   const completion = scentTotal === 0 ? 0 : successCount / scentTotal;
+  const totalPoints = activityPoints + secretPoints + missionBonus;
   const headline = status === "complete" ? "MISSION COMPLETE" : "MISSION FAILED";
   const headlineColor = status === "complete" ? "text-emerald-200" : "text-rose-300";
 
@@ -198,6 +226,27 @@ export function ScoreSummary({ onRestart, onMissions }: ScoreSummaryProps) {
               results.map((r) => <ResultRow key={r.index} r={r} ordinal={r.index + 1} />)
             )}
           </ul>
+
+          {/* Flat economy: every line is a fixed value the player could predict. */}
+          <ul className="mt-2 bg-black/30 rounded-lg px-3 py-2">
+            <BreakdownRow label="Activities" value={activityPoints} />
+            <BreakdownRow
+              label={`Hidden secrets (${secretsClaimed} × ${SCORE.hiddenSecret})`}
+              value={secretPoints}
+              muted={secretPoints === 0}
+            />
+            <BreakdownRow
+              label="Mission bonus (all activities)"
+              value={missionBonus}
+              muted={missionBonus === 0}
+            />
+            <li className="flex items-center justify-between gap-3 pt-2 mt-1 border-t border-white/10">
+              <span className="font-display tracking-widest text-sm text-white/85">TOTAL</span>
+              <span className="font-display tabular-nums text-lg tracking-wider text-amber-200">
+                +{totalPoints}
+              </span>
+            </li>
+          </ul>
         </div>
 
         <div className="mt-5 flex items-end justify-between">
@@ -211,7 +260,7 @@ export function ScoreSummary({ onRestart, onMissions }: ScoreSummaryProps) {
               )}
             </div>
             <div className="font-display text-3xl text-amber-200 tracking-wider tabular-nums">
-              +{points}
+              +{totalPoints}
             </div>
             <div className="mt-1 font-ui text-[11px] text-white/45 tracking-wider tabular-nums">
               Total {totalPredatorPoints.toLocaleString()} · Best run +{bestMissionPoints}

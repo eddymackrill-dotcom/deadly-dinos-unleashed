@@ -76,7 +76,8 @@ const ALL_ARROWS: ArrowDir[] = ["up", "down", "left", "right"];
  *    200ms post-deadline grace where a correct press still counts as a
  *    half-point "late" hit instead of a full miss.
  *
- * All-full-hits → win; some credit → partial (points ∝ score); none → lose.
+ * All-full-hits → win; some credit → partial; none → lose. The hit ratio decides
+ * the outcome only — the award itself is flat (see data/scoring.ts).
  */
 export class DefenseSystem {
   private phase: Phase = "idle";
@@ -280,11 +281,6 @@ export class DefenseSystem {
     useGameState.getState().endDefense(result, flashUntil);
 
     if (result !== "lose") this.cb.onGlitchSting();
-  }
-
-  /** Points multiplier for a partial outcome, based on scored hit ratio. */
-  partialPointsRatio(): number {
-    return defenseScore(this.roundResults) / ROUNDS;
   }
 
   private finalize(result: DefenseResult) {

@@ -7,7 +7,7 @@ a patch on top of `v0.4-m4`.
 |---|---|---|
 | 1 | Spinosaurus rebuild — fish-catching, model orientation, Jaw Snap | ✅ |
 | 2 | Catch animation overhaul (shared across all encounters) | ✅ |
-| 3 | BBC-style flat point economy + TRAIL HUD label | ⏳ |
+| 3 | BBC-style flat point economy + TRAIL HUD label | ✅ |
 | 4 | Tests, progress report, `v0.4.1-fixes` tag | ⏳ |
 
 ---
@@ -125,6 +125,45 @@ self-test):
 - The catch FX now own the input lock and the win-path camera/glitch work, so
   `onCameraShake` / `onGlitchSting` were removed from the chase and stealth
   callback interfaces rather than left dangling.
+
+---
+
+## Chunk 3 — Flat point economy
+
+`src/data/scoring.ts` is now the only place a point value is written down.
+Level configs build their nodes through `nodePoints(type)`, so a node can't
+drift from the economy by hand-editing.
+
+| Activity | Award |
+|---|---|
+| Collect scent node | 100 |
+| Chase catch | 200 (miss 0) |
+| Stealth pounce | 200 (spotted 0) |
+| Fish catch | 100 per fish, 2 needed = 200 |
+| Defense, all 3 correct | 200 |
+| Defense, partial (1–2 of 3) | 100 |
+| Defense, all missed | 0 |
+| Hidden secret | 500 flat |
+| Mission bonus (100% of activities) | 500 |
+
+Removed on the way through:
+
+- The `pointsRange` random bundle on hidden secrets — `SecretConfig` no longer
+  has the field at all, so there's nowhere for a random award to come back from.
+- Stat-scaled defense scoring. `DefenseSystem.partialPointsRatio()` is deleted;
+  the hit ratio still decides win/partial/lose, it just doesn't scale the award.
+  Toughness keeps its gameplay effect (a wider reaction window), senses keeps
+  its (tracking duration, stealth drain) — neither touches the score.
+- Hand-authored per-node point values in `levels.ts`.
+
+The score summary now shows a breakdown — activities, hidden secrets
+(`n × 500`), mission bonus, then TOTAL — and the headline number is that total,
+which matches what gets committed to the save. Previously the headline showed
+activity points only while the save recorded activities + secrets.
+
+HUD: `SCENT 3 / 6` → **`TRAIL: 3 OF 6`**, spelled out so it reads as progress
+along a trail rather than a score. The power icon's hardcoded "DASH" label now
+shows the active dino's power name.
 
 ---
 

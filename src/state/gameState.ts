@@ -100,6 +100,8 @@ export interface MissionState {
   hiddenSecretsClaimed: number;
   hiddenSecretsTotal: number;
   secretBonusPoints: number;
+  /** Flat mission-complete bonus, awarded only at 100% activities. */
+  missionBonusPoints: number;
   rewardPopup: { id: number; text: string; spawnedAt: number } | null;
 
   /** Display name of the active dino's animal power (HUD label under the X icon). */
@@ -141,6 +143,7 @@ export interface MissionState {
   endDefense: (result: ChaseOutcome, flashUntil: number) => void;
   setHiddenSecretsProgress: (claimed: number, total: number) => void;
   addSecretPoints: (points: number) => void;
+  setMissionBonus: (points: number) => void;
   pushRewardPopup: (text: string) => void;
   setPowerName: (name: string) => void;
   setPowerState: (info: {
@@ -190,6 +193,7 @@ const initial: Omit<
   | "endDefense"
   | "setHiddenSecretsProgress"
   | "addSecretPoints"
+  | "setMissionBonus"
   | "pushRewardPopup"
   | "setPowerName"
   | "setPowerState"
@@ -242,6 +246,7 @@ const initial: Omit<
   hiddenSecretsClaimed: 0,
   hiddenSecretsTotal: 0,
   secretBonusPoints: 0,
+  missionBonusPoints: 0,
   rewardPopup: null,
 
   powerName: "POWER",
@@ -344,6 +349,7 @@ export const useGameState = create<MissionState>((set) => ({
     set({ hiddenSecretsClaimed: claimed, hiddenSecretsTotal: total }),
   addSecretPoints: (points) =>
     set((s) => ({ secretBonusPoints: s.secretBonusPoints + points })),
+  setMissionBonus: (points) => set({ missionBonusPoints: points }),
   pushRewardPopup: (text) =>
     set({ rewardPopup: { id: rewardPopupCounter++, text, spawnedAt: performance.now() } }),
   setPowerName: (name) => set({ powerName: name }),

@@ -2,6 +2,7 @@ import * as THREE from "three";
 import type { BiomeId, DinoId } from "./dinosaurs";
 import type { ScentNodeConfig } from "../levels/ScentSequence";
 import type { SecretConfig } from "../systems/HiddenSecretsSystem";
+import { nodePoints } from "./scoring";
 
 export interface LedgeConfig {
   x: number;
@@ -18,8 +19,14 @@ export interface LevelConfig {
   ledges?: LedgeConfig[];
 }
 
+/** Node values are never authored by hand — they come from the flat economy. */
+function node(x: number, type: ScentNodeConfig["type"]): ScentNodeConfig {
+  return { position: new THREE.Vector3(x, 0.4, 0), type, points: nodePoints(type) };
+}
+
 // Each mission uses a distinct node count/positions/ordering so they feel
-// different. Sequences mix all 4 mechanics (collect / chase / stealth / defense).
+// different. Sequences mix the mechanics (collect / chase / stealth / defense,
+// and fish in place of chase for Spinosaurus).
 
 export const LEVELS: Record<DinoId, LevelConfig> = {
   // Mission 1 — Eoraptor, Triassic (the original L1 layout).
@@ -28,16 +35,16 @@ export const LEVELS: Record<DinoId, LevelConfig> = {
     dinoId: "eoraptor",
     biomeId: "triassic_argentina",
     nodes: [
-      { position: new THREE.Vector3(12, 0.4, 0), type: "collect", points: 100 },
-      { position: new THREE.Vector3(28, 0.4, 0), type: "chase", points: 250 },
-      { position: new THREE.Vector3(46, 0.4, 0), type: "collect", points: 100 },
-      { position: new THREE.Vector3(62, 0.4, 0), type: "stealth", points: 300 },
-      { position: new THREE.Vector3(80, 0.4, 0), type: "defense", points: 300 },
-      { position: new THREE.Vector3(95, 0.4, 0), type: "collect", points: 100 },
+      node(12, "collect"),
+      node(28, "chase"),
+      node(46, "collect"),
+      node(62, "stealth"),
+      node(80, "defense"),
+      node(95, "collect"),
     ],
     secrets: [
-      { id: "l1_secret_ground_37", position: new THREE.Vector3(37, 0.4, 0), pointsRange: [100, 300] },
-      { id: "l1_secret_ledge_85", position: new THREE.Vector3(90, 1.35, 0), pointsRange: [200, 500] },
+      { id: "l1_secret_ground_37", position: new THREE.Vector3(37, 0.4, 0) },
+      { id: "l1_secret_ledge_85", position: new THREE.Vector3(90, 1.35, 0) },
     ],
     ledges: [{ x: 90, y: 1.0, halfWidth: 1.6 }],
   },
@@ -48,16 +55,16 @@ export const LEVELS: Record<DinoId, LevelConfig> = {
     dinoId: "deinonychus",
     biomeId: "cretaceous_jungle",
     nodes: [
-      { position: new THREE.Vector3(10, 0.4, 0), type: "collect", points: 100 },
-      { position: new THREE.Vector3(24, 0.4, 0), type: "chase", points: 250 },
-      { position: new THREE.Vector3(40, 0.4, 0), type: "stealth", points: 300 },
-      { position: new THREE.Vector3(58, 0.4, 0), type: "chase", points: 250 },
-      { position: new THREE.Vector3(74, 0.4, 0), type: "defense", points: 300 },
-      { position: new THREE.Vector3(90, 0.4, 0), type: "collect", points: 100 },
+      node(10, "collect"),
+      node(24, "chase"),
+      node(40, "stealth"),
+      node(58, "chase"),
+      node(74, "defense"),
+      node(90, "collect"),
     ],
     secrets: [
-      { id: "l2_secret_ground_33", position: new THREE.Vector3(33, 0.4, 0), pointsRange: [150, 350] },
-      { id: "l2_secret_ledge_66", position: new THREE.Vector3(66, 1.45, 0), pointsRange: [250, 550] },
+      { id: "l2_secret_ground_33", position: new THREE.Vector3(33, 0.4, 0) },
+      { id: "l2_secret_ledge_66", position: new THREE.Vector3(66, 1.45, 0) },
     ],
     ledges: [{ x: 66, y: 1.1, halfWidth: 1.6 }],
   },
@@ -68,16 +75,16 @@ export const LEVELS: Record<DinoId, LevelConfig> = {
     dinoId: "trex",
     biomeId: "cretaceous_plains",
     nodes: [
-      { position: new THREE.Vector3(14, 0.4, 0), type: "collect", points: 100 },
-      { position: new THREE.Vector3(30, 0.4, 0), type: "stealth", points: 300 },
-      { position: new THREE.Vector3(48, 0.4, 0), type: "defense", points: 300 },
-      { position: new THREE.Vector3(66, 0.4, 0), type: "chase", points: 250 },
-      { position: new THREE.Vector3(82, 0.4, 0), type: "defense", points: 300 },
-      { position: new THREE.Vector3(96, 0.4, 0), type: "collect", points: 100 },
+      node(14, "collect"),
+      node(30, "stealth"),
+      node(48, "defense"),
+      node(66, "chase"),
+      node(82, "defense"),
+      node(96, "collect"),
     ],
     secrets: [
-      { id: "l3_secret_ground_22", position: new THREE.Vector3(22, 0.4, 0), pointsRange: [150, 350] },
-      { id: "l3_secret_ledge_74", position: new THREE.Vector3(74, 1.55, 0), pointsRange: [250, 550] },
+      { id: "l3_secret_ground_22", position: new THREE.Vector3(22, 0.4, 0) },
+      { id: "l3_secret_ledge_74", position: new THREE.Vector3(74, 1.55, 0) },
     ],
     ledges: [{ x: 74, y: 1.2, halfWidth: 1.8 }],
   },
@@ -90,16 +97,16 @@ export const LEVELS: Record<DinoId, LevelConfig> = {
     dinoId: "spinosaurus",
     biomeId: "cretaceous_swamp",
     nodes: [
-      { position: new THREE.Vector3(12, 0.4, 0), type: "collect", points: 100 }, // near bank
-      { position: new THREE.Vector3(22, 0.4, 0), type: "stealth", points: 300 }, // reeds
-      { position: new THREE.Vector3(38, 0.4, 0), type: "fish", points: 200 }, // water
-      { position: new THREE.Vector3(52, 0.4, 0), type: "fish", points: 200 }, // water
-      { position: new THREE.Vector3(66, 0.4, 0), type: "fish", points: 200 }, // water
-      { position: new THREE.Vector3(84, 0.4, 0), type: "defense", points: 300 }, // far bank
+      node(12, "collect"), // near bank
+      node(22, "stealth"), // reeds
+      node(38, "fish"), // water
+      node(52, "fish"), // water
+      node(66, "fish"), // water
+      node(84, "defense"), // far bank
     ],
     secrets: [
-      { id: "l4_secret_ground_76", position: new THREE.Vector3(76, 0.4, 0), pointsRange: [150, 350] },
-      { id: "l4_secret_ledge_26", position: new THREE.Vector3(26, 1.45, 0), pointsRange: [250, 550] },
+      { id: "l4_secret_ground_76", position: new THREE.Vector3(76, 0.4, 0) },
+      { id: "l4_secret_ledge_26", position: new THREE.Vector3(26, 1.45, 0) },
     ],
     ledges: [{ x: 26, y: 1.1, halfWidth: 1.6 }],
   },

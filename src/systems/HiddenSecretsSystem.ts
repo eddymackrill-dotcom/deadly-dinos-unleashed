@@ -1,12 +1,11 @@
 import * as THREE from "three";
 import { HiddenSecret } from "../entities/HiddenSecret";
 import { useGameState } from "../state/gameState";
+import { SCORE } from "../data/scoring";
 
 export interface SecretConfig {
   id: string;
   position: THREE.Vector3;
-  /** [min,max] predator points awarded on pickup (random per pickup). */
-  pointsRange: [number, number];
 }
 
 const PICKUP_RADIUS = 1.6; // 3D distance — generous so a jump-through still hits
@@ -40,9 +39,6 @@ export class HiddenSecretsSystem {
         continue;
       }
       const secret = new HiddenSecret(cfg.id, cfg.position);
-      // Stash points-range on the entity for use at pickup.
-      (secret as unknown as { pointsRange: [number, number] }).pointsRange =
-        cfg.pointsRange;
       this.secrets.push(secret);
       this.cb.scene.add(secret.root);
     }
@@ -63,10 +59,8 @@ export class HiddenSecretsSystem {
     if (this.claimedIds.has(secret.id)) return;
     this.claimedIds.add(secret.id);
 
-    const range = (secret as unknown as { pointsRange?: [number, number] })
-      .pointsRange ?? [100, 500];
-    const [min, max] = range;
-    const points = Math.floor(min + Math.random() * (max - min + 1));
+    // Flat value, every time — a secret is always worth exactly SCORE.hiddenSecret.
+    const points = SCORE.hiddenSecret;
 
     useGameState.getState().addSecretPoints(points);
     useGameState.getState().setHiddenSecretsProgress(this.claimedIds.size, this.total);

@@ -9,6 +9,7 @@ import { PowerSystem } from "../systems/PowerSystem";
 import { DINOS } from "../data/dinosaurs";
 import { HiddenSecretsSystem, type SecretConfig } from "../systems/HiddenSecretsSystem";
 import { useGameState } from "../state/gameState";
+import { SCORE } from "../data/scoring";
 
 /**
  * M3 logic self-tests. Each test verifies the core state machine of one M3
@@ -108,8 +109,8 @@ function runHiddenSecretsTest() {
   // Fake scene tree — three.js Group is fully usable in node.
   const scene = new THREE.Group();
   const configs: SecretConfig[] = [
-    { id: "a", position: new THREE.Vector3(10, 0.5, 0), pointsRange: [200, 200] },
-    { id: "b", position: new THREE.Vector3(20, 0.5, 0), pointsRange: [300, 300] },
+    { id: "a", position: new THREE.Vector3(10, 0.5, 0) },
+    { id: "b", position: new THREE.Vector3(20, 0.5, 0) },
   ];
 
   const sys = new HiddenSecretsSystem({ scene }, configs, []);
@@ -126,7 +127,7 @@ function runHiddenSecretsTest() {
   claimed = sys.claimedCount;
   bonus = useGameState.getState().secretBonusPoints;
   assert(claimed === 1, `${tag}: after walkover, claimedCount=1 (got ${claimed})`);
-  assert(bonus === 200, `${tag}: bonus should be 200 (got ${bonus})`);
+  assert(bonus === SCORE.hiddenSecret, `${tag}: flat secret award ${SCORE.hiddenSecret} (got ${bonus})`);
   const bonusAfterFirst = bonus;
 
   // Walk over "a" again — must NOT re-fire reward.
@@ -142,7 +143,10 @@ function runHiddenSecretsTest() {
   claimed = sys.claimedCount;
   bonus = useGameState.getState().secretBonusPoints;
   assert(claimed === 2, `${tag}: after second walkover, claimedCount=2 (got ${claimed})`);
-  assert(bonus === 500, `${tag}: total bonus should be 500 (got ${bonus})`);
+  assert(
+    bonus === SCORE.hiddenSecret * 2,
+    `${tag}: two secrets = ${SCORE.hiddenSecret * 2} (got ${bonus})`,
+  );
 
   // Already-found secrets must not respawn on a fresh system.
   const scene2 = new THREE.Group();

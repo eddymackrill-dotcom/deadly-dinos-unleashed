@@ -25,9 +25,9 @@ function TrackingBar() {
   const pct = Math.max(0, Math.min(1, trackingPercent));
   const danger = pct < 0.25;
 
-  // Per spec: while there are uncollected nodes, display "SCENT n/total" where
-  // n is the 1-indexed active (i.e. next-to-collect) node. After all are
-  // collected, show n=total.
+  // "TRAIL: 3 OF 6" — n is the 1-indexed active (next-to-collect) node while any
+  // remain, and the total once they're all collected. Spelled out rather than
+  // "3/6" so it reads as progress along a trail, not a score.
   const activeOrdinal = Math.min(scentCollected + 1, scentTotal);
   const barColor =
     status === "complete"
@@ -59,7 +59,7 @@ function TrackingBar() {
         </div>
       </div>
       <div className="font-ui text-xs text-white/70 tracking-wide">
-        SCENT {activeOrdinal} / {scentTotal}
+        TRAIL: {activeOrdinal} OF {scentTotal}
       </div>
     </div>
   );
