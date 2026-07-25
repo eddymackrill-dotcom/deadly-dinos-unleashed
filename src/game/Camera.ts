@@ -76,6 +76,36 @@ export class Camera {
     return this.setFOV(BASE_FOV, durationSeconds);
   }
 
+  /**
+   * Catch punch-in: snap the FOV down by `dropDegrees`, then spring back to the
+   * base FOV over the remainder of `ms`. Runs from wherever the FOV currently
+   * is, so it composes with the chase's wider FOV.
+   */
+  punchFOV(dropDegrees: number, ms: number) {
+    const seconds = ms / 1000;
+    const ref = { v: this.currentFOV };
+    const apply = () => {
+      this.currentFOV = ref.v;
+      this.camera.fov = ref.v;
+      this.camera.updateProjectionMatrix();
+    };
+    gsap.killTweensOf(ref);
+    gsap
+      .timeline()
+      .to(ref, {
+        v: this.currentFOV - dropDegrees,
+        duration: seconds * 0.35,
+        ease: "power3.out",
+        onUpdate: apply,
+      })
+      .to(ref, {
+        v: BASE_FOV,
+        duration: seconds * 0.65,
+        ease: "back.out(1.8)",
+        onUpdate: apply,
+      });
+  }
+
   update(dt: number) {
     if (!this.target || dt <= 0) return;
 

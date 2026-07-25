@@ -6,7 +6,7 @@ a patch on top of `v0.4-m4`.
 | Chunk | Scope | Status |
 |---|---|---|
 | 1 | Spinosaurus rebuild — fish-catching, model orientation, Jaw Snap | ✅ |
-| 2 | Catch animation overhaul (shared across all encounters) | ⏳ |
+| 2 | Catch animation overhaul (shared across all encounters) | ✅ |
 | 3 | BBC-style flat point economy + TRAIL HUD label | ⏳ |
 | 4 | Tests, progress report, `v0.4.1-fixes` tag | ⏳ |
 
@@ -87,7 +87,48 @@ a headless three.js parse) before touching any code. Findings:
 - Defense on this level reuses the existing T-Rex rival (`rival_trex.glb`); no
   aquatic rival placeholder was authored.
 
-### Known asset gaps (not blockers)
+---
+
+## Chunk 2 — Catch animation overhaul
+
+One choreography, `src/systems/CatchFX.ts`, now runs for every catch. Chase,
+stealth and fishing all hand their prey to it and only differ in the word that
+appears. Defense keeps its own flow, as specified — it has no prey to tackle.
+
+Timeline from contact (all constants exported as `CATCH_TIMING`, asserted by the
+self-test):
+
+| t | What happens |
+|---|---|
+| 0 ms | player control frozen · player lunges +0.5 u forward · prey nudged, toppled, squashed (Y×0.7 / X×1.15) · camera shake 0.2 for 150 ms · FOV punch −2° · aberration spike to 0.015 for 250 ms |
+| 200 ms | the word appears — `CAUGHT!` / `POUNCED!` / `SNAPPED!` |
+| 800 ms | control released · prey begins a 400 ms fade |
+| 1200 ms | prey despawns, the node resolves, points award |
+
+- **Attack clips are used where the rig has them.** Eoraptor (Velociraptor mesh)
+  and T-Rex both carry an `Attack` clip; those play over the locomotion blend,
+  time-scaled to the lunge, and the procedural 15° nose-down tilt is skipped.
+  Deinonychus inherits the Velociraptor clip. Spinosaurus has no clips at all,
+  so it always gets the tilt.
+- Stage transitions are driven from the game loop, not gsap callbacks, so a
+  ticker hitch can't strand the player frozen. `Game.dispose()` force-finishes
+  the sequence.
+- Bloodless throughout, per CLAUDE.md's CBBC floor: the prey is knocked over and
+  lies still, then fades. No kill, no blood, no death animation (the GLB has a
+  `Death` clip — deliberately unused).
+
+### Deviations from spec
+
+- The prey topples about **Z, not X**. Side-on, an X-axis roll tips the animal
+  away from the camera and foreshortens it into nothing; a Z topple is the one
+  that reads as "bowled over". Same 90°, same 250 ms.
+- The catch FX now own the input lock and the win-path camera/glitch work, so
+  `onCameraShake` / `onGlitchSting` were removed from the chase and stealth
+  callback interfaces rather than left dangling.
+
+---
+
+## Known asset gaps (not blockers)
 
 - Spinosaurus GLB has no animation clips (above). A rigged replacement is a
   roster-sourcing decision deferred past M2 in CLAUDE.md — flagging it here so it

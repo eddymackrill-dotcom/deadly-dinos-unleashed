@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Fish } from "../entities/Fish";
 import { useGameState } from "../state/gameState";
+import { CATCH_TOTAL_MS, type CatchTarget } from "./CatchFX";
 
 /**
  * Spinosaurus fish-catching encounter (replaces "chase" on the swamp level).
@@ -37,15 +38,17 @@ export const FISHING_TUNING = {
 };
 
 const FLASH_DURATION_MS = 900;
-const WIN_RESOLVE_SECONDS = FLASH_DURATION_MS / 1000;
+/** A win now runs the shared tackle choreography, so it resolves on its clock. */
+const WIN_RESOLVE_SECONDS = CATCH_TOTAL_MS / 1000;
 const LOSE_RESOLVE_SECONDS = 0.8;
 
 export interface FishingCallbacks {
   scene: THREE.Object3D;
   setChevronOverride: (x: number | null) => void;
   onCameraShake: (mag: number, dur: number) => void;
-  onGlitchSting: () => void;
   setPlayerInputLocked: (locked: boolean) => void;
+  /** Run the shared catch choreography (snap → tumble → fade). */
+  playCatch: (target: CatchTarget | null, facing: 1 | -1, onTextFlash: () => void) => void;
   /** World-X range of the river this encounter takes place in. */
   waterRangeFor: (x: number) => [number, number] | null;
   /** Player's in-water wade speed — fish cruise at SPEED_RATIO × this. */
@@ -66,6 +69,7 @@ export class FishingSystem {
   private snapResolved = true;
   private waterRange: [number, number] = [0, 0];
   private playerFacing: 1 | -1 = 1;
+  private lastCaught: Fish | null = null;
 
   constructor(private cb: FishingCallbacks) {}
 
@@ -86,6 +90,7 @@ export class FishingSystem {
     this.resolveTimeLeft = 0;
     this.pendingResult = null;
     this.playerFacing = playerFacing;
+    this.lastCaught = null;
     this.waterRange = this.cb.waterRangeFor(nodeX) ?? [nodeX - 8, nodeX + 8];
 
     const speed = this.cb.playerWadeSpeed * FISHING_TUNING.SPEED_RATIO;
@@ -165,7 +170,7 @@ export class FishingSystem {
     );
 
     if (this.caught >= FISHING_TUNING.FISH_NEEDED) {
-      this.beginResolve("win");
+      this.beginResolve("win", playerPosition.x);
       return;
     }
     if (this.timer <= 0) this.beginResolve("lose");
@@ -191,17 +196,20 @@ export class FishingSystem {
     }
 
     target.markCaught();
+    this.lastCaught = target;
     this.caught += 1;
     useGameState.getState().setFishingState(
       this.timer / FISHING_TUNING.DURATION_SECONDS,
       this.caught,
     );
-    this.onFishCaught?.(target);
-    this.cb.onCameraShake(0.1, 0.08);
+    this.onFishCaught?.(target, this.caught);
+    // The final fish gets the full tackle choreography in beginResolve; the
+    // earlier ones get a lighter kick so the encounter still has punctuation.
+    if (this.caught < FISHING_TUNING.FISH_NEEDED) this.cb.onCameraShake(0.1, 0.08);
   }
 
-  /** Set by Game — plays the catch choreography on the caught fish. */
-  onFishCaught: ((fish: Fish) => void) | null = null;
+  /** Set by Game — per-fish feedback (popup, sound). */
+  onFishCaught: ((fish: Fish, caughtCount: number) => void) | null = null;
 
   private fishSpeed(): number {
     return this.cb.playerWadeSpeed * FISHING_TUNING.SPEED_RATIO;
@@ -242,18 +250,34 @@ export class FishingSystem {
     return best;
   }
 
-  private beginResolve(result: "win" | "lose") {
+  private beginResolve(result: "win" | "lose", playerX = 0) {
     this.phase = "resolving";
     this.pendingResult = result;
     this.resolveTimeLeft = result === "win" ? WIN_RESOLVE_SECONDS : LOSE_RESOLVE_SECONDS;
-    const flashUntil = performance.now() + FLASH_DURATION_MS;
-    useGameState.getState().endFishing(result, flashUntil);
 
-    if (result === "win") {
-      this.cb.onCameraShake(0.18, 0.1);
-      this.cb.onGlitchSting();
-      this.cb.setPlayerInputLocked(true);
+    if (result === "lose") {
+      useGameState.getState().endFishing(result, performance.now() + FLASH_DURATION_MS);
+      return;
     }
+
+    // Win: the fish that completed the catch gets the shared choreography, so a
+    // snap lands with the same weight as a chase tackle — just a different word.
+    const fish = this.lastCaught;
+    const facing: 1 | -1 = fish && fish.position.x < playerX ? -1 : 1;
+    const target: CatchTarget | null = fish
+      ? {
+          root: fish.root,
+          setOpacity: (o) => fish.setOpacity(o),
+          freezeForCatch: () => fish.freezeForCatch(),
+          // Ownership stays with this system; finalize() disposes the shoal.
+          onDespawn: () => {
+            fish.root.visible = false;
+          },
+        }
+      : null;
+    this.cb.playCatch(target, facing, () => {
+      useGameState.getState().endFishing("win", performance.now() + FLASH_DURATION_MS);
+    });
   }
 
   private finalize(result: "win" | "lose") {
@@ -262,8 +286,8 @@ export class FishingSystem {
       f.dispose();
     }
     this.fish = [];
+    this.lastCaught = null;
     this.cb.setChevronOverride(null);
-    if (result === "win") this.cb.setPlayerInputLocked(false);
     this.phase = "idle";
     this.pendingResult = null;
     this.resolveTimeLeft = 0;

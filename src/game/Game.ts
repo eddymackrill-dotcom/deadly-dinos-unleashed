@@ -17,6 +17,7 @@ import { ChaseSystem } from "../systems/ChaseSystem";
 import { StealthSystem } from "../systems/StealthSystem";
 import { FishingSystem } from "../systems/FishingSystem";
 import { DefenseSystem } from "../systems/DefenseSystem";
+import { CatchFX } from "../systems/CatchFX";
 import { HiddenSecretsSystem } from "../systems/HiddenSecretsSystem";
 import { PowerSystem } from "../systems/PowerSystem";
 import { trackingDuration, DINOS, type DinoId, type DinoDef } from "../data/dinosaurs";
@@ -56,6 +57,17 @@ export class GameFX {
       .to(this.intensityRef, { value: 0, duration: 0.5, ease: "power2.in" });
   }
 
+  /** Catch-moment aberration spike — stronger and longer than the old sting. */
+  catchSpike(peak: number, ms: number) {
+    const seconds = ms / 1000;
+    gsap.killTweensOf(this.intensityRef);
+    gsap
+      .timeline()
+      .set(this.intensityRef, { value: 0 })
+      .to(this.intensityRef, { value: peak, duration: seconds * 0.25, ease: "power2.out" })
+      .to(this.intensityRef, { value: 0, duration: seconds * 0.75, ease: "power2.in" });
+  }
+
   dashBurst() {
     gsap.killTweensOf(this.intensityRef);
     gsap
@@ -81,6 +93,7 @@ export class Game {
   private defense: DefenseSystem;
   private secrets: HiddenSecretsSystem;
   private power: PowerSystem;
+  private catchFX: CatchFX;
   private wake: WakeTrail | null = null;
   private stealthSpeedMult = 1;
   private powerSpeedMult = 1;
@@ -117,6 +130,17 @@ export class Game {
     this.postProcess = new PostProcess(this.scene.renderer, this.scene.scene, this.camera.camera);
     this.fx = new GameFX(this.postProcess.glitchIntensity);
 
+    // One choreography for every kind of catch — chase, stealth, fish.
+    this.catchFX = new CatchFX({
+      player: this.player,
+      setPlayerInputLocked: (locked) => {
+        this.inputLocked = locked;
+      },
+      onCameraShake: (mag, dur) => this.camera.shake(mag, dur),
+      onFOVPunch: (drop, ms) => this.camera.punchFOV(drop, ms),
+      onGlitchSpike: (peak, ms) => this.fx.catchSpike(peak, ms),
+    });
+
     const dinoSave = getDinoSave(dino.id);
     const missionSave = getMissionSave(dino.id, this.missionId);
 
@@ -144,13 +168,13 @@ export class Game {
     this.chase = new ChaseSystem({
       scene: this.scene.scene,
       setChevronOverride: (x) => this.level.setChevronTargetOverride(x),
-      onCameraShake: (mag, dur) => this.camera.shake(mag, dur),
       onFOVPulse: () => this.camera.setFOV(CHASE_FOV, 0.5),
       onFOVReset: () => this.camera.resetFOV(0.5),
-      onGlitchSting: () => this.fx.catchSting(),
       setPlayerInputLocked: (locked) => {
         this.inputLocked = locked;
       },
+      playCatch: (target, facing, onTextFlash) =>
+        this.catchFX.play({ target, facing, onTextFlash }),
       isInstantCatchActive: () => this.instantCatchActive,
     });
     this.chase.onResolved = (outcome) => {
@@ -161,11 +185,11 @@ export class Game {
     this.stealth = new StealthSystem({
       scene: this.scene.scene,
       setChevronOverride: (x) => this.level.setChevronTargetOverride(x),
-      onCameraShake: (mag, dur) => this.camera.shake(mag, dur),
-      onGlitchSting: () => this.fx.catchSting(),
       setPlayerInputLocked: (locked) => {
         this.inputLocked = locked;
       },
+      playCatch: (target, facing, onTextFlash) =>
+        this.catchFX.play({ target, facing, onTextFlash }),
       setPlayerSpeedMult: (m) => {
         this.stealthSpeedMult = m;
         this.applySpeedMultiplier();
@@ -184,10 +208,11 @@ export class Game {
       scene: this.scene.scene,
       setChevronOverride: (x) => this.level.setChevronTargetOverride(x),
       onCameraShake: (mag, dur) => this.camera.shake(mag, dur),
-      onGlitchSting: () => this.fx.catchSting(),
       setPlayerInputLocked: (locked) => {
         this.inputLocked = locked;
       },
+      playCatch: (target, facing, onTextFlash) =>
+        this.catchFX.play({ target, facing, onTextFlash }),
       waterRangeFor: (x) => this.level.waterRangeAt?.(x) ?? null,
       playerWadeSpeed: 5.0 * WATER_SPEED_MULT,
     });
@@ -195,8 +220,9 @@ export class Game {
       const ev = this.level.sequence.resolveEncounter(outcome);
       if (ev && ev.kind === "collected") this.applyCollected(ev);
     };
-    this.fishing.onFishCaught = (fish) => {
-      fish.setOpacity(0.35);
+    this.fishing.onFishCaught = (fish, caughtCount) => {
+      // The last fish is handed to the catch choreography, which does the fade.
+      if (caughtCount < 2) fish.setOpacity(0.35);
       useGameState.getState().pushRewardPopup("FISH!");
     };
 
@@ -399,6 +425,7 @@ export class Game {
     if (!this.input.powerHeld) this.power.release();
 
     this.power.update(dt);
+    this.catchFX.update(dt);
     this.player.update(dt);
     this.updateWading(dt);
     this.camera.update(dt);
@@ -475,6 +502,7 @@ export class Game {
 
   dispose() {
     this.stop();
+    this.catchFX.finish();
     this.input.dispose();
     if (this.wake) {
       this.scene.scene.remove(this.wake.root);

@@ -163,6 +163,31 @@ export class Dinosaur {
   }
 
   /**
+   * The tackle at the moment of a catch: a 0.5-unit forward lunge held through
+   * the freeze, with the rig's attack clip driving the body if it has one and a
+   * ~15° nose-down tilt standing in when it doesn't (the Spinosaurus sculpt).
+   * Timings mirror CATCH_TIMING; the lunge is visual-only, so the authoritative
+   * `position` never moves.
+   */
+  playCatchLunge(facing: 1 | -1) {
+    const usedClip = this.playAttackClip(0.55);
+    if (!usedClip) {
+      const tilt = (facing * 15 * Math.PI) / 180;
+      gsap.killTweensOf(this.root.rotation);
+      gsap
+        .timeline()
+        .to(this.root.rotation, { z: -tilt, duration: 0.15, ease: "power3.out" })
+        .to(this.root.rotation, { z: 0, duration: 0.35, delay: 0.25, ease: "power2.inOut" });
+    }
+
+    gsap.killTweensOf(this.lungeRef);
+    gsap
+      .timeline()
+      .to(this.lungeRef, { value: facing * 0.5, duration: 0.15, ease: "power3.out" })
+      .to(this.lungeRef, { value: 0, duration: 0.2, delay: 0.3, ease: "power2.inOut" });
+  }
+
+  /**
    * Play the GLB's attack clip once, blended over the locomotion actions.
    * Returns false when the model has no attack clip (caller falls back to a
    * procedural tween).

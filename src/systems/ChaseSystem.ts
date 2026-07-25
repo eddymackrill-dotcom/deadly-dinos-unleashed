@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { PreyAnimal } from "../entities/PreyAnimal";
 import { useGameState } from "../state/gameState";
+import { CATCH_TOTAL_MS, type CatchTarget } from "./CatchFX";
 
 // Catch math (player at full sprint should beat the timer with comfortable margin):
 //   time_to_close = (head_start - catch_radius) / (PLAYER_MAX_SPEED * (1 - PREY_SPEED_RATIO))
@@ -15,16 +16,17 @@ const CATCH_RADIUS = 1.8;
 const PLAYER_MAX_SPEED = 5.0;
 const FLASH_DURATION_MS = 900;
 const LOSE_TAIL_SECONDS = 0.8;
-const WIN_RESOLVE_SECONDS = FLASH_DURATION_MS / 1000;
+/** A win now runs the shared tackle choreography, so it resolves on its clock. */
+const WIN_RESOLVE_SECONDS = CATCH_TOTAL_MS / 1000;
 
 export interface ChaseCallbacks {
   scene: THREE.Object3D;
   setChevronOverride: (x: number | null) => void;
-  onCameraShake: (mag: number, dur: number) => void;
   onFOVPulse: () => void;
   onFOVReset: () => void;
-  onGlitchSting: () => void;
   setPlayerInputLocked: (locked: boolean) => void;
+  /** Run the shared catch choreography (tackle → tumble → fade). */
+  playCatch: (target: CatchTarget | null, facing: 1 | -1, onTextFlash: () => void) => void;
   /** Sickle Strike etc. — when active, contact range is generous (instant catch). */
   isInstantCatchActive?: () => boolean;
 }
@@ -97,7 +99,7 @@ export class ChaseSystem {
     const dx = this.prey.position.x - playerPosition.x;
     const catchRadius = this.cb.isInstantCatchActive?.() ? INSTANT_CATCH_RADIUS : CATCH_RADIUS;
     if (Math.abs(dx) <= catchRadius) {
-      this.beginResolve("win");
+      this.beginResolve("win", playerPosition.x);
       return;
     }
     if (this.timer <= 0) {
@@ -105,17 +107,35 @@ export class ChaseSystem {
     }
   }
 
-  private beginResolve(result: "win" | "lose") {
+  private beginResolve(result: "win" | "lose", playerX = 0) {
     this.phase = "resolving";
     this.pendingResult = result;
     this.resolveTimeLeft = result === "win" ? WIN_RESOLVE_SECONDS : LOSE_TAIL_SECONDS;
-    const flashUntil = performance.now() + FLASH_DURATION_MS;
-    useGameState.getState().endChase(result, flashUntil);
 
-    if (result === "win") {
-      this.cb.onCameraShake(0.18, 0.1);
-      this.cb.onGlitchSting();
-      this.cb.setPlayerInputLocked(true);
+    if (result === "lose") {
+      useGameState.getState().endChase(result, performance.now() + FLASH_DURATION_MS);
+      return;
+    }
+
+    // Win: hand the prey to the catch choreography. It owns the freeze, the
+    // tumble, the fade and the despawn; the "CAUGHT!" flash fires from its
+    // 200ms callback so the word lands after the tackle, not on contact.
+    const prey = this.prey;
+    this.prey = null;
+    const facing: 1 | -1 = prey && prey.position.x < playerX ? -1 : 1;
+    if (prey) {
+      const target: CatchTarget = {
+        root: prey.root,
+        setOpacity: (o) => prey.setOpacity(o),
+        freezeForCatch: () => prey.freezeForCatch(),
+        onDespawn: () => {
+          this.cb.scene.remove(prey.root);
+          prey.dispose();
+        },
+      };
+      this.cb.playCatch(target, facing, () => {
+        useGameState.getState().endChase("win", performance.now() + FLASH_DURATION_MS);
+      });
     }
   }
 
@@ -127,7 +147,6 @@ export class ChaseSystem {
     }
     this.cb.setChevronOverride(null);
     this.cb.onFOVReset();
-    if (result === "win") this.cb.setPlayerInputLocked(false);
     this.phase = "idle";
     this.pendingResult = null;
     this.resolveTimeLeft = 0;

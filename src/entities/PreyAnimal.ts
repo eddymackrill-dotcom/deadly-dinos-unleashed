@@ -60,6 +60,9 @@ export class PreyAnimal {
   private readonly modelBaseRotationY = Math.PI / 2;
   private currentRotationY = Math.PI / 2;
   private disposed = false;
+  /** Set once tackled: the catch choreography owns the transform from here on. */
+  private frozen = false;
+  private materials: THREE.MeshLambertMaterial[] = [];
 
   constructor() {
     void this.attachModel();
@@ -116,6 +119,39 @@ export class PreyAnimal {
     }
   }
 
+  /**
+   * Hand the mesh over to the catch choreography: stop the walk cycle and stop
+   * writing `root` from `position`, so the tumble tween is the only thing
+   * moving it.
+   */
+  freezeForCatch() {
+    this.frozen = true;
+    this.velocity.x = 0;
+    this.mixer?.stopAllAction();
+  }
+
+  /** Fade during the catch despawn. Materials are per-instance, so this is safe. */
+  setOpacity(opacity: number) {
+    if (this.materials.length === 0) this.captureMaterials();
+    for (const m of this.materials) {
+      const wantsTransparency = opacity < 1;
+      if (wantsTransparency !== m.transparent) {
+        m.transparent = wantsTransparency;
+        m.needsUpdate = true;
+      }
+      m.opacity = opacity;
+    }
+  }
+
+  private captureMaterials() {
+    this.root.traverse((obj) => {
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const m of mats) this.materials.push(m as THREE.MeshLambertMaterial);
+    });
+  }
+
   setPosition(x: number, y: number, z: number) {
     this.position.set(x, y, z);
     this.root.position.copy(this.position);
@@ -126,6 +162,7 @@ export class PreyAnimal {
   }
 
   update(dt: number) {
+    if (this.frozen) return;
     this.position.x += this.velocity.x * dt;
     this.root.position.x = this.position.x;
     this.root.position.y = this.position.y;

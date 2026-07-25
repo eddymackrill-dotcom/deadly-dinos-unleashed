@@ -27,6 +27,7 @@ export class Fish {
   respawnTimer = 0;
 
   private body: THREE.Group;
+  private frozen = false;
   private clock: number;
   private velocityX = 0;
   private baseSpeed = 0;
@@ -86,6 +87,13 @@ export class Fish {
     this.velocityX = 0;
   }
 
+  /** Hand the mesh to the catch choreography — stop writing root from position. */
+  freezeForCatch() {
+    this.state = "caught";
+    this.velocityX = 0;
+    this.frozen = true;
+  }
+
   setOpacity(opacity: number) {
     for (const m of this.materials) {
       const wantsTransparency = opacity < 1;
@@ -98,6 +106,7 @@ export class Fish {
   }
 
   update(dt: number) {
+    if (this.frozen) return;
     this.clock += dt;
 
     if (this.state === "fleeing") {
