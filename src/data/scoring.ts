@@ -30,6 +30,18 @@ export const SCORE = {
   missionCompleteBonus: 500,
 } as const;
 
+/**
+ * Mission-complete bonus: flat, and only when every activity in the mission was
+ * completed successfully. A partial or a missed node forfeits it entirely.
+ */
+export function missionBonusPoints(
+  results: ReadonlyArray<{ outcome: string }>,
+  totalNodes: number,
+): number {
+  if (totalNodes === 0 || results.length !== totalNodes) return 0;
+  return results.every((r) => r.outcome === "win") ? SCORE.missionCompleteBonus : 0;
+}
+
 /** Full value of a scent node of the given type. */
 export function nodePoints(type: ScentNodeType): number {
   switch (type) {

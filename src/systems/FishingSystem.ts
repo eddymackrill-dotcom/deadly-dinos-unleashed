@@ -64,7 +64,9 @@ export class FishingSystem {
   private caught = 0;
   private resolveTimeLeft = 0;
   private pendingResult: "win" | "lose" | null = null;
-  private snapUntil = 0;
+  /** Seconds left on the open jaw hitbox. Driven by dt, not the wall clock, so
+   *  the window is frame-consistent and the self-test can step it. */
+  private snapTimeLeft = 0;
   private snapFacing: 1 | -1 = 1;
   private snapResolved = true;
   private waterRange: [number, number] = [0, 0];
@@ -79,7 +81,7 @@ export class FishingSystem {
 
   /** True while an extended-jaw hitbox is live (HUD + debug). */
   get isSnapping(): boolean {
-    return performance.now() < this.snapUntil;
+    return this.snapTimeLeft > 0;
   }
 
   start(nodeX: number, playerFacing: 1 | -1) {
@@ -113,7 +115,7 @@ export class FishingSystem {
    */
   triggerSnap(facing: 1 | -1) {
     if (this.phase !== "running") return;
-    this.snapUntil = performance.now() + FISHING_TUNING.SNAP_WINDOW_MS;
+    this.snapTimeLeft = FISHING_TUNING.SNAP_WINDOW_MS / 1000;
     this.snapFacing = facing;
     this.snapResolved = false;
   }
@@ -129,7 +131,6 @@ export class FishingSystem {
     }
     if (this.phase !== "running") return;
 
-    const now = performance.now();
     const [x0, x1] = this.waterRange;
 
     for (const f of this.fish) {
@@ -155,10 +156,21 @@ export class FishingSystem {
       }
     }
 
-    // Resolve the snap on the frame the jaws close.
-    if (!this.snapResolved && now >= this.snapUntil) {
-      this.snapResolved = true;
-      this.resolveSnap(playerPosition);
+    // The jaws are live for the whole window: any fish that enters the hitbox
+    // while it's open is caught, so the player doesn't have to lead a moving
+    // target to the exact closing frame. Only a window that closes empty misses.
+    if (this.snapTimeLeft > 0) {
+      this.snapTimeLeft = Math.max(0, this.snapTimeLeft - dt);
+      if (!this.snapResolved) {
+        const caught = this.tryCatchDuringSnap(playerPosition);
+        if (caught) {
+          this.snapResolved = true;
+          this.snapTimeLeft = 0;
+        } else if (this.snapTimeLeft === 0) {
+          this.snapResolved = true;
+          this.onSnapMissed(playerPosition);
+        }
+      }
     }
 
     this.cb.setChevronOverride(this.nearestFishX(playerPosition.x));
@@ -176,24 +188,24 @@ export class FishingSystem {
     if (this.timer <= 0) this.beginResolve("lose");
   }
 
-  /** Pure hitbox test — exported shape used by the self-test. */
-  private resolveSnap(playerPosition: THREE.Vector3) {
+  /** A snap that closed with nothing in the jaws — the shoal scatters. */
+  private onSnapMissed(playerPosition: THREE.Vector3) {
+    for (const f of this.fish) {
+      if (f.state !== "swimming") continue;
+      if (Math.abs(f.position.x - playerPosition.x) <= FISHING_TUNING.SNAP_REACH + 2) {
+        f.flee(playerPosition.x, FISHING_TUNING.RESPAWN_SECONDS);
+      }
+    }
+  }
+
+  /** Per-frame check while the jaws are open. Returns true if a fish was taken. */
+  private tryCatchDuringSnap(playerPosition: THREE.Vector3): boolean {
     const target = this.fish.find(
       (f) =>
         f.state === "swimming" &&
         inSnapHitbox(playerPosition, f.position, this.snapFacing, FISHING_TUNING.SNAP_REACH),
     );
-
-    if (!target) {
-      // A miss spooks anything nearby — the water erupts and the fish scatter.
-      for (const f of this.fish) {
-        if (f.state !== "swimming") continue;
-        if (Math.abs(f.position.x - playerPosition.x) <= FISHING_TUNING.SNAP_REACH + 2) {
-          f.flee(playerPosition.x, FISHING_TUNING.RESPAWN_SECONDS);
-        }
-      }
-      return;
-    }
+    if (!target) return false;
 
     target.markCaught();
     this.lastCaught = target;
@@ -206,6 +218,7 @@ export class FishingSystem {
     // The final fish gets the full tackle choreography in beginResolve; the
     // earlier ones get a lighter kick so the encounter still has punctuation.
     if (this.caught < FISHING_TUNING.FISH_NEEDED) this.cb.onCameraShake(0.1, 0.08);
+    return true;
   }
 
   /** Set by Game — per-fish feedback (popup, sound). */
@@ -300,6 +313,7 @@ export class FishingSystem {
       phase: this.phase,
       caught: this.caught,
       timer: this.timer,
+      snapping: this.isSnapping,
       fishStates: this.fish.map((f) => f.state),
       fishPositions: this.fish.map((f) => f.position.x),
     };

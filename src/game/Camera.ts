@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import gsap from "gsap";
+import { gsap } from "gsap";
 
 export interface CameraTarget {
   position: THREE.Vector3;

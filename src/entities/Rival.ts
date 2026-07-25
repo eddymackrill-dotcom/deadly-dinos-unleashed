@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import gsap from "gsap";
+import { gsap } from "gsap";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 

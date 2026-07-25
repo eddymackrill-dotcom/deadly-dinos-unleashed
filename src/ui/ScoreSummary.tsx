@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import gsap from "gsap";
+import { gsap } from "gsap";
 import { useGameState, type ScentResultView, type DinoStatsView } from "../state/gameState";
 import type { ScentNodeType } from "../levels/ScentSequence";
 import { SCORE } from "../data/scoring";

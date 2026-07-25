@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import gsap from "gsap";
+import { gsap } from "gsap";
 
 /**
  * A glowing pile of bones/fossils/glinting stones. Walk over it (3D proximity

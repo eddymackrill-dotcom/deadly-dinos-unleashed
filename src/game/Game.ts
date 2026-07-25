@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import gsap from "gsap";
+import { gsap } from "gsap";
 import { Scene } from "./Scene";
 import { Camera } from "./Camera";
 import { Input } from "./Input";
@@ -21,7 +21,7 @@ import { CatchFX } from "../systems/CatchFX";
 import { HiddenSecretsSystem } from "../systems/HiddenSecretsSystem";
 import { PowerSystem } from "../systems/PowerSystem";
 import { trackingDuration, DINOS, type DinoId, type DinoDef } from "../data/dinosaurs";
-import { SCORE } from "../data/scoring";
+import { SCORE, missionBonusPoints } from "../data/scoring";
 import { getBiome } from "../data/biomes";
 import { useGameState } from "../state/gameState";
 import { commitMissionResult, getDinoSave, getMissionSave } from "../progression/Save";
@@ -347,16 +347,11 @@ export class Game {
     this.wake?.update(dt, inWater, this.player.position.x, this.player.speed);
   }
 
-  /**
-   * The mission-complete bonus: a flat 500, and only when every activity in the
-   * mission was completed successfully. A partial or missed node forfeits it.
-   */
+  /** Flat mission bonus — the rule itself lives in data/scoring.ts. */
   private missionBonusFor(): number {
     const seq = this.level.sequence;
     if (!seq.isComplete) return 0;
-    const results = seq.getResults();
-    const allWon = results.length === seq.total && results.every((r) => r.outcome === "win");
-    return allWon ? SCORE.missionCompleteBonus : 0;
+    return missionBonusPoints(seq.getResults(), seq.total);
   }
 
   private commitMissionToSave() {

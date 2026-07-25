@@ -8,7 +8,7 @@ a patch on top of `v0.4-m4`.
 | 1 | Spinosaurus rebuild — fish-catching, model orientation, Jaw Snap | ✅ |
 | 2 | Catch animation overhaul (shared across all encounters) | ✅ |
 | 3 | BBC-style flat point economy + TRAIL HUD label | ✅ |
-| 4 | Tests, progress report, `v0.4.1-fixes` tag | ⏳ |
+| 4 | Tests, progress report, `v0.4.1-fixes` tag | ✅ |
 
 ---
 
@@ -167,6 +167,47 @@ shows the active dino's power name.
 
 ---
 
+## Chunk 4 — Tests
+
+`npm test` passes: 33 assertions groups across four suites, `tsc --noEmit` clean,
+`vite build` clean. New suite `src/levels/PatchSelfTest.ts`, wired into
+`scripts/run-selftest.mjs` alongside the M3/M4 suites:
+
+- **Fishing end-to-end** — start the encounter, assert 4 fish spawn inside the
+  river and the HUD arms for 2; snap a fish and assert the catch registers and
+  the HUD follows; snap a second and assert the encounter resolves as a win,
+  runs the catch choreography exactly once, publishes the `fish` result source
+  (so the verb is `SNAPPED!`), then advances the node and clears the scene.
+- **Miss and respawn** — a snap into empty water catches nothing, spooks the
+  fish within range, and the shoal is back in the river 2 s later.
+- **Timeout** — 20 s without a catch loses the node and plays no choreography.
+- **Jaw hitbox** — `inSnapHitbox` is direction-aware: 1.5 u ahead hits, 2.5 u
+  ahead misses, behind the snout misses, and flipping the facing reverses it.
+- **Catch timings** — every `CATCH_TIMING` constant asserted against the spec,
+  plus a live `CatchFX` driven frame by frame: locked and lunging at 0 ms, no
+  word yet, word on the 200 ms beat, still frozen at 760 ms, unlocked on the
+  800 ms mark mid-fade, despawned at 1200 ms.
+- **Point economy** — each activity's fixed value, every value a round hundred,
+  each of the four missions' clean-run totals (900 / 1000 / 1000 / 1100) and
+  their 500 bonus, a defense partial awarding exactly 100, a miss awarding 0,
+  and both forfeiting the bonus.
+
+Two behaviour changes fell out of writing these:
+
+- **The jaw hitbox is now live for the whole 300 ms window**, not just evaluated
+  on the closing frame. The spec says "if a fish is in the hitbox *during* the
+  snap"; the closing-frame version forced the player to lead a moving target to
+  an exact frame, which is far too demanding for a 7–11 audience. A window that
+  closes empty is still a miss.
+- **The snap window is driven by `dt`, not `performance.now()`**, so it's
+  frame-consistent and steppable in the test.
+- `import gsap from "gsap"` → `import { gsap } from "gsap"` across the four
+  files that use it: under Node ESM the default import resolves to a namespace
+  object whose methods aren't callable, which broke the headless test. Same
+  object in the browser build.
+
+---
+
 ## Known asset gaps (not blockers)
 
 - Spinosaurus GLB has no animation clips (above). A rigged replacement is a
@@ -174,3 +215,31 @@ shows the active dino's power name.
   lands in that pass.
 - `player_deinonychus.glb` is still a broken placeholder (1 mesh named `Cube.002`,
   0 clips); Deinonychus continues to reuse the Velociraptor mesh, as in M4.
+- Audio remains blocked on file sourcing, so none of the new moments (splash,
+  jaw snap, tackle impact) have sound yet. The choreography has obvious hooks
+  for it when the files land.
+
+---
+
+## Needs a human playtest
+
+Nothing here can be verified without eyes on it:
+
+1. **Spinosaurus faces right and reads as a Spinosaurus.** The rotation is
+   derived from vertex data rather than guessed, but the sculpt is a diorama
+   pose — worth confirming it doesn't look like it's lying down.
+2. **The wading waterline.** The submerged 40% is hidden by the ground plane
+   from the side-scroll camera; if the camera angle drifts in a later milestone
+   the dino's legs could reappear "inside" the river.
+3. **Jaw Snap timing feel** — 300 ms and 2 units are the spec's numbers, and the
+   hitbox is generous now, but only play will say whether catching two fish is
+   too easy or still fiddly.
+4. **Whether the 800 ms catch freeze is too long** when it happens six times a
+   mission.
+
+---
+
+## Deferred (explicitly not in this patch)
+
+Full HUD polish pass (Session 2), additional dinosaurs (Session 3), M5
+meta-progression (Session 4), audio (blocked on sourcing).
